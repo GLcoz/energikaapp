@@ -245,17 +245,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Demo Credentials */}
-          <div className="mt-8 p-4 rounded-lg bg-[var(--color-bg-tertiary)] border border-[var(--color-border-default)]">
-            <p className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wide mb-3">
-              Comptes de démonstration
-            </p>
-            <div className="space-y-2 text-sm">
-              <p className="text-xs text-[var(--color-text-secondary)] mb-2">
-                Vous devez créer des comptes depuis le tableau de bord Supabase (onglet Authentication) avec les emails et mots de passe de votre choix.
-              </p>
-            </div>
-          </div>
         </div>
       </div>
     </div>
