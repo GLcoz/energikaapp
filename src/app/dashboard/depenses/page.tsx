@@ -8,6 +8,7 @@ import {
   Search,
   Tag,
   Trash2,
+  Download,
 } from "lucide-react";
 import { formatCurrency, formatShortDate } from "@/lib/utils";
 import { demoExpenses } from "@/lib/demo-data";
@@ -82,6 +83,61 @@ export default function DepensesPage() {
     }
   };
 
+  const handleExportPDF = async () => {
+    if (!filteredExpenses.length) {
+      alert("Aucune dépense à exporter.");
+      return;
+    }
+
+    const [{ jsPDF }, autoTableModule] = await Promise.all([
+      import("jspdf"),
+      import("jspdf-autotable"),
+    ]);
+
+    const autoTable = autoTableModule.default ?? autoTableModule.autoTable;
+    const doc = new jsPDF();
+
+    const pageTitle = "Export des dépenses";
+    const subtitle =
+      filterCategory === "ALL"
+        ? "Toutes les catégories"
+        : `Catégorie: ${categoryLabels[filterCategory]}`;
+    const today = new Date().toLocaleDateString("fr-FR");
+
+    doc.setFontSize(18);
+    doc.text(pageTitle, 14, 16);
+    doc.setFontSize(11);
+    doc.text(`Date d'export: ${today}`, 14, 24);
+    doc.text(subtitle, 14, 30);
+    doc.text(`Recherche: ${searchTerm || "Aucune"}`, 14, 36);
+    doc.text(`Total: ${formatCurrency(totalExpenses)}`, 14, 42);
+
+    autoTable(doc, {
+      startY: 50,
+      head: [["Titre", "Catégorie", "Montant", "Date", "Description"]],
+      body: filteredExpenses.map((expense) => [
+        expense.title,
+        categoryLabels[expense.category],
+        formatCurrency(expense.amount),
+        formatShortDate(expense.date),
+        expense.description || "—",
+      ]),
+      styles: {
+        fontSize: 9,
+        cellPadding: 2,
+      },
+      headStyles: {
+        fillColor: [220, 38, 38],
+        textColor: 255,
+      },
+      alternateRowStyles: {
+        fillColor: [249, 250, 251],
+      },
+    });
+
+    doc.save(`depenses-${new Date().toISOString().slice(0, 10)}.pdf`);
+  };
+
   return (
     <div className="space-y-6 fade-in">
       {/* Header */}
@@ -97,13 +153,22 @@ export default function DepensesPage() {
             Gestion des charges du centre
           </p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="btn btn-primary"
-        >
-          <Plus size={18} />
-          Nouvelle Dépense
-        </button>
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={handleExportPDF}
+            className="btn btn-secondary"
+          >
+            <Download size={18} />
+            Exporter PDF
+          </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="btn btn-primary"
+          >
+            <Plus size={18} />
+            Nouvelle Dépense
+          </button>
+        </div>
       </div>
 
       {/* Category Summary */}
