@@ -44,12 +44,31 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
+    if (!body?.firstName || !body?.lastName || !body?.parentPhone || !body?.startDate) {
+      return NextResponse.json(
+        { error: "Missing required fields" },
+        { status: 400 }
+      );
+    }
+
+    const rawTherapistId =
+      typeof body.therapistId === "string" ? body.therapistId.trim() : "";
+
+    const providedProfile = rawTherapistId
+      ? await prisma.profile.findFirst({
+          where: {
+            OR: [{ id: rawTherapistId }, { authId: rawTherapistId }],
+          },
+          select: { id: true },
+        })
+      : null;
+
     const fallbackProfile = await prisma.profile.findFirst({
       select: { id: true },
       orderBy: { createdAt: "asc" },
     });
 
-    const therapistId = body.therapistId || fallbackProfile?.id;
+    const therapistId = providedProfile?.id || fallbackProfile?.id;
     if (!therapistId) {
       return NextResponse.json(
         { error: "No therapist profile found to attach patient" },
