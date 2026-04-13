@@ -68,7 +68,42 @@ export async function POST(request: Request) {
       orderBy: { createdAt: "asc" },
     });
 
-    const therapistId = providedProfile?.id || fallbackProfile?.id;
+    let therapistId = providedProfile?.id || fallbackProfile?.id;
+
+    if (!therapistId && rawTherapistId) {
+      const therapistEmail =
+        typeof body.therapistEmail === "string" && body.therapistEmail.trim()
+          ? body.therapistEmail.trim().toLowerCase()
+          : `${rawTherapistId}@local.energika`;
+      const therapistFirstName =
+        typeof body.therapistFirstName === "string" && body.therapistFirstName.trim()
+          ? body.therapistFirstName.trim()
+          : "Therapeute";
+      const therapistLastName =
+        typeof body.therapistLastName === "string" ? body.therapistLastName.trim() : "";
+      const therapistRole = body.therapistRole === "ADMIN" ? "ADMIN" : "ORTHO";
+
+      const createdProfile = await prisma.profile.upsert({
+        where: { authId: rawTherapistId },
+        update: {
+          email: therapistEmail,
+          firstName: therapistFirstName,
+          lastName: therapistLastName,
+          role: therapistRole,
+        },
+        create: {
+          authId: rawTherapistId,
+          email: therapistEmail,
+          firstName: therapistFirstName,
+          lastName: therapistLastName,
+          role: therapistRole,
+        },
+        select: { id: true },
+      });
+
+      therapistId = createdProfile.id;
+    }
+
     if (!therapistId) {
       return NextResponse.json(
         { error: "No therapist profile found to attach patient" },

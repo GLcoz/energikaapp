@@ -93,6 +93,10 @@ export default function PatientsPage() {
         body: JSON.stringify({
           ...newPatient,
           therapistId: user?.id,
+          therapistEmail: user?.email,
+          therapistFirstName: user?.firstName,
+          therapistLastName: user?.lastName,
+          therapistRole: user?.role,
         }),
       });
 
