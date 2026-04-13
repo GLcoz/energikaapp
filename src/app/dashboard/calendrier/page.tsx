@@ -102,12 +102,23 @@ export default function CalendrierPage() {
     };
   });
 
-  const handleDateClick = (info: { dateStr: string }) => {
+  const handleDateClick = (info: { date: Date; dateStr: string }) => {
     setAddSessionError("");
+    
+    // For datetime-local input, we need YYYY-MM-DDTHH:mm
+    // We adjust for timezone offset to get the correct local time string
+    const start = info.date;
+    const offset = start.getTimezoneOffset() * 60000;
+    const localStart = new Date(start.getTime() - offset).toISOString().slice(0, 16);
+    
+    // Default duration: 45 minutes
+    const end = new Date(start.getTime() + 45 * 60000);
+    const localEnd = new Date(end.getTime() - offset).toISOString().slice(0, 16);
+
     setNewSession({
       patientId: "",
-      startTime: `${info.dateStr}T09:00`,
-      endTime: `${info.dateStr}T09:45`,
+      startTime: localStart,
+      endTime: localEnd,
       notes: "",
     });
     setShowAddModal(true);
@@ -137,8 +148,8 @@ export default function CalendrierPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: `Séance - ${patient.firstName} ${patient.lastName}`,
-          startTime: newSession.startTime,
-          endTime: newSession.endTime,
+          startTime: new Date(newSession.startTime).toISOString(),
+          endTime: new Date(newSession.endTime).toISOString(),
           notes: newSession.notes,
           patientId: newSession.patientId,
           therapistId: user?.id,
@@ -238,10 +249,13 @@ export default function CalendrierPage() {
         <button
           onClick={() => {
             setAddSessionError("");
+            const now = new Date();
+            const offset = now.getTimezoneOffset() * 60000;
+            const today = new Date(now.getTime() - offset).toISOString().split("T")[0];
             setNewSession({
               patientId: "",
-              startTime: `${new Date().toISOString().split("T")[0]}T09:00`,
-              endTime: `${new Date().toISOString().split("T")[0]}T09:45`,
+              startTime: `${today}T09:00`,
+              endTime: `${today}T09:45`,
               notes: "",
             });
             setShowAddModal(true);
@@ -281,14 +295,14 @@ export default function CalendrierPage() {
           }}
           locale="fr"
           events={events}
-          dateClick={handleDateClick}
+          dateClick={handleDateClick as any}
           eventClick={handleEventClick}
           eventDrop={handleSessionMoveOrResize}
           eventResize={handleSessionMoveOrResize}
           editable={true}
           selectable={true}
           dayMaxEvents={3}
-          height="auto"
+          height="800px"
           buttonText={{
             today: "Aujourd'hui",
             month: "Mois",
@@ -296,10 +310,19 @@ export default function CalendrierPage() {
             day: "Jour",
             list: "Liste",
           }}
-          slotMinTime="08:00:00"
-          slotMaxTime="19:00:00"
+          slotMinTime="07:00:00"
+          slotMaxTime="21:00:00"
           allDaySlot={false}
           slotDuration="00:30:00"
+          snapDuration="00:05:00"
+          slotLabelInterval="01:00"
+          expandRows={true}
+          nowIndicator={true}
+          businessHours={{
+            daysOfWeek: [1, 2, 3, 4, 5, 6], // Lundi - Samedi
+            startTime: "09:00",
+            endTime: "19:00",
+          }}
           eventDisplay="block"
           eventTimeFormat={{
             hour: "2-digit",
