@@ -8,6 +8,7 @@ function mapSession(session: {
   endTime: Date;
   notes: string | null;
   isCompleted: boolean;
+  isAbsent: boolean;
   patientId: string;
   therapistId: string;
 }) {

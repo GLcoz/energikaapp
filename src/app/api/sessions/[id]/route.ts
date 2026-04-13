@@ -8,6 +8,7 @@ function mapSession(session: {
   endTime: Date;
   notes: string | null;
   isCompleted: boolean;
+  isAbsent: boolean;
   patientId: string;
   therapistId: string;
 }) {
@@ -32,6 +33,8 @@ export async function PATCH(
       data: {
         isCompleted:
           typeof body.isCompleted === "boolean" ? body.isCompleted : undefined,
+        isAbsent:
+          typeof body.isAbsent === "boolean" ? body.isAbsent : undefined,
         startTime: body.startTime ? new Date(body.startTime) : undefined,
         endTime: body.endTime ? new Date(body.endTime) : undefined,
         notes: typeof body.notes === "string" ? body.notes : undefined,

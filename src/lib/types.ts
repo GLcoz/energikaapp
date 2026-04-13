@@ -58,6 +58,7 @@ export interface Session {
   endTime: string;
   notes?: string;
   isCompleted: boolean;
+  isAbsent: boolean;
   patientId: string;
   patient?: Patient;
   therapistId: string;

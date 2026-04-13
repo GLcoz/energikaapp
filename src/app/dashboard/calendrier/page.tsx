@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { Calendar as CalendarIcon, Plus, X, ChevronDown, ChevronUp } from "lucide-react";
-import { demoSessions, demoPatients, demoBillings } from "@/lib/demo-data";
+import { Calendar as CalendarIcon, Plus, X, ChevronDown, ChevronUp, UserX } from "lucide-react";
 import type { Session, Patient, User } from "@/lib/types";
 
 // Dynamic import FullCalendar to avoid SSR issues
@@ -24,8 +23,8 @@ import listPlugin from "@fullcalendar/list";
 
 export default function CalendrierPage() {
   const [user, setUser] = useState<User | null>(null);
-  const [patients, setPatients] = useState<Patient[]>(demoPatients);
-  const [sessions, setSessions] = useState<Session[]>(demoSessions);
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [addSessionError, setAddSessionError] = useState("");
   const [selectedEvent, setSelectedEvent] = useState<Session | null>(null);
@@ -49,17 +48,13 @@ export default function CalendrierPage() {
         ]);
 
         if (patientsRes.ok) {
-          const patientsData = (await patientsRes.json()) as Patient[];
-          setPatients(patientsData);
+          setPatients((await patientsRes.json()) as Patient[]);
         }
-
         if (sessionsRes.ok) {
-          const sessionsData = (await sessionsRes.json()) as Session[];
-          setSessions(sessionsData);
+          setSessions((await sessionsRes.json()) as Session[]);
         }
       } catch {
-        setPatients(demoPatients);
-        setSessions(demoSessions);
+        // keep empty — no demo fallback
       }
     };
 
@@ -71,32 +66,34 @@ export default function CalendrierPage() {
   // Transform sessions to FullCalendar events
   const events = sessions.map((session) => {
     const patient = patients.find((p) => p.id === session.patientId);
-    const billing = demoBillings.find(
-      (b) => b.patientId === session.patientId && b.month === currentMonth
-    );
-    const isUnpaid = billing && billing.status !== "PAID";
+
+    // Priority: absent (orange) > completed (green) > planned (blue)
+    const bgColor = session.isAbsent
+      ? "#f97316"
+      : session.isCompleted
+      ? "#10b981"
+      : "#1e6bb8";
+    const borderColor = session.isAbsent
+      ? "#ea580c"
+      : session.isCompleted
+      ? "#059669"
+      : "#1e40af";
 
     return {
       id: session.id,
-      title: `${patient?.firstName} ${patient?.lastName}`,
+      title: session.isAbsent
+        ? `🚫 ${patient?.firstName} ${patient?.lastName}`
+        : `${patient?.firstName} ${patient?.lastName}`,
       start: session.startTime,
       end: session.endTime,
-      backgroundColor: session.isCompleted
-        ? "#10b981"
-        : isUnpaid
-        ? "#ef4444"
-        : "#1e6bb8",
-      borderColor: session.isCompleted
-        ? "#059669"
-        : isUnpaid
-        ? "#dc2626"
-        : "#1e40af",
+      backgroundColor: bgColor,
+      borderColor,
       textColor: "#ffffff",
       extendedProps: {
         sessionId: session.id,
         patientId: session.patientId,
         isCompleted: session.isCompleted,
-        isUnpaid,
+        isAbsent: session.isAbsent,
         notes: session.notes,
       },
     };
@@ -190,12 +187,33 @@ export default function CalendrierPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isCompleted: !target.isCompleted }),
       });
-
       if (!response.ok) return;
-
       const updated = (await response.json()) as Session;
       setSessions((prev) => prev.map((s) => (s.id === sessionId ? updated : s)));
-      setSelectedEvent(null);
+      setSelectedEvent(updated);
+    } catch {
+      // keep UI unchanged on network/server error
+    }
+  };
+
+  const toggleAbsent = async (sessionId: string) => {
+    const target = sessions.find((s) => s.id === sessionId);
+    if (!target) return;
+
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          isAbsent: !target.isAbsent,
+          // If marking absent, also unmark completed
+          isCompleted: target.isAbsent ? target.isCompleted : false,
+        }),
+      });
+      if (!response.ok) return;
+      const updated = (await response.json()) as Session;
+      setSessions((prev) => prev.map((s) => (s.id === sessionId ? updated : s)));
+      setSelectedEvent(updated);
     } catch {
       // keep UI unchanged on network/server error
     }
@@ -278,8 +296,8 @@ export default function CalendrierPage() {
           <span className="text-[var(--color-text-muted)]">Terminée</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-red-500" />
-          <span className="text-[var(--color-text-muted)]">Patient impayé</span>
+          <div className="w-3 h-3 rounded-full bg-orange-500" />
+          <span className="text-[var(--color-text-muted)]">Patient absent</span>
         </div>
       </div>
 
@@ -352,7 +370,11 @@ export default function CalendrierPage() {
             return (
               <div
                 key={session.id}
-                className="rounded-xl border border-[var(--color-border-light)] bg-white"
+                className={`rounded-xl border bg-white ${
+                  session.isAbsent
+                    ? "border-orange-200"
+                    : "border-[var(--color-border-light)]"
+                }`}
               >
                 <button
                   type="button"
@@ -377,9 +399,16 @@ export default function CalendrierPage() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <span className={`badge ${session.isCompleted ? "badge-success" : "badge-info"}`}>
-                      {session.isCompleted ? "Terminée" : "Planifiée"}
-                    </span>
+                    {session.isAbsent && (
+                      <span className="badge" style={{ background: "#fed7aa", color: "#c2410c" }}>
+                        Absent
+                      </span>
+                    )}
+                    {!session.isAbsent && (
+                      <span className={`badge ${session.isCompleted ? "badge-success" : "badge-info"}`}>
+                        {session.isCompleted ? "Terminée" : "Planifiée"}
+                      </span>
+                    )}
                     {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                   </div>
                 </button>
@@ -389,12 +418,27 @@ export default function CalendrierPage() {
                     <p className="text-sm text-[var(--color-text-secondary)]">
                       {session.notes || "Aucune note pour cette séance."}
                     </p>
-                    <button
-                      onClick={() => toggleComplete(session.id)}
-                      className={`btn ${session.isCompleted ? "btn-secondary" : "btn-primary"}`}
-                    >
-                      {session.isCompleted ? "Marquer non terminée" : "Marquer terminée"}
-                    </button>
+                    <div className="flex gap-2">
+                      {!session.isAbsent && (
+                        <button
+                          onClick={() => void toggleComplete(session.id)}
+                          className={`btn ${session.isCompleted ? "btn-secondary" : "btn-primary"}`}
+                        >
+                          {session.isCompleted ? "Marquer non terminée" : "Marquer terminée"}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => void toggleAbsent(session.id)}
+                        className={`btn ${
+                          session.isAbsent
+                            ? "btn-secondary"
+                            : "text-orange-600 hover:bg-orange-50 border border-[var(--color-border-default)]"
+                        }`}
+                      >
+                        <UserX size={14} />
+                        {session.isAbsent ? "Annuler absence" : "Patient absent"}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -464,27 +508,43 @@ export default function CalendrierPage() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <span
-                      className={`badge ${
-                        selectedEvent.isCompleted ? "badge-success" : "badge-info"
-                      }`}
-                    >
-                      {selectedEvent.isCompleted ? "Terminée" : "Planifiée"}
-                    </span>
+                    {selectedEvent.isAbsent && (
+                      <span className="badge" style={{ background: "#fed7aa", color: "#c2410c" }}>
+                        Absent
+                      </span>
+                    )}
+                    {!selectedEvent.isAbsent && (
+                      <span
+                        className={`badge ${
+                          selectedEvent.isCompleted ? "badge-success" : "badge-info"
+                        }`}
+                      >
+                        {selectedEvent.isCompleted ? "Terminée" : "Planifiée"}
+                      </span>
+                    )}
                   </div>
 
-                  <div className="flex gap-3 pt-4">
+                  <div className="flex gap-2 pt-4">
+                    {!selectedEvent.isAbsent && (
+                      <button
+                        onClick={() => void toggleComplete(selectedEvent.id)}
+                        className={`flex-1 btn ${
+                          selectedEvent.isCompleted ? "btn-secondary" : "btn-primary"
+                        }`}
+                      >
+                        {selectedEvent.isCompleted ? "Marquer non terminée" : "Marquer terminée"}
+                      </button>
+                    )}
                     <button
-                      onClick={() => toggleComplete(selectedEvent.id)}
+                      onClick={() => void toggleAbsent(selectedEvent.id)}
                       className={`flex-1 btn ${
-                        selectedEvent.isCompleted
+                        selectedEvent.isAbsent
                           ? "btn-secondary"
-                          : "btn-primary"
+                          : "text-orange-600 bg-orange-50 hover:bg-orange-100 border border-orange-200"
                       }`}
                     >
-                      {selectedEvent.isCompleted
-                        ? "Marquer non terminée"
-                        : "Marquer terminée"}
+                      <UserX size={14} />
+                      {selectedEvent.isAbsent ? "Annuler absence" : "Patient absent"}
                     </button>
                   </div>
                 </div>

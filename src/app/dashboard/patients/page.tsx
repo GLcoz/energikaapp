@@ -15,13 +15,14 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { demoPatients, demoBillings, demoSessions } from "@/lib/demo-data";
-import type { Patient, Session, User } from "@/lib/types";
+import type { Patient, Session, MonthlyBilling, User } from "@/lib/types";
 
 export default function PatientsPage() {
   const [user, setUser] = useState<User | null>(null);
-  const [patients, setPatients] = useState<Patient[]>(demoPatients);
-  const [sessions, setSessions] = useState<Session[]>(demoSessions);
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [billings, setBillings] = useState<MonthlyBilling[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -47,24 +48,27 @@ export default function PatientsPage() {
     if (stored) setUser(JSON.parse(stored));
 
     const loadData = async () => {
+      setLoading(true);
       try {
-        const [patientsRes, sessionsRes] = await Promise.all([
+        const [patientsRes, sessionsRes, billingsRes] = await Promise.all([
           fetch("/api/patients", { cache: "no-store" }),
           fetch("/api/sessions", { cache: "no-store" }),
+          fetch("/api/billings", { cache: "no-store" }),
         ]);
 
         if (patientsRes.ok) {
-          const patientsData = (await patientsRes.json()) as Patient[];
-          setPatients(patientsData);
+          setPatients((await patientsRes.json()) as Patient[]);
         }
-
         if (sessionsRes.ok) {
-          const sessionsData = (await sessionsRes.json()) as Session[];
-          setSessions(sessionsData);
+          setSessions((await sessionsRes.json()) as Session[]);
+        }
+        if (billingsRes.ok) {
+          setBillings((await billingsRes.json()) as MonthlyBilling[]);
         }
       } catch {
-        setPatients(demoPatients);
-        setSessions(demoSessions);
+        // keep empty on error — no demo data fallback
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -212,10 +216,43 @@ export default function PatientsPage() {
         />
       </div>
 
+      {/* Loading skeleton */}
+      {loading && (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="card p-5">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="skeleton w-11 h-11 rounded-full" />
+                <div className="flex-1 space-y-2">
+                  <div className="skeleton h-4 rounded w-3/4" />
+                  <div className="skeleton h-3 rounded w-1/2" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="skeleton h-3 rounded w-full" />
+                <div className="skeleton h-3 rounded w-2/3" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!loading && filteredPatients.length === 0 && (
+        <div className="flex flex-col items-center justify-center h-48 text-center gap-3">
+          <Users className="w-10 h-10 text-[var(--color-text-muted)]" />
+          <p className="text-[var(--color-text-muted)] text-sm">Aucun patient enregistré.</p>
+          <button onClick={() => setShowAddModal(true)} className="btn btn-primary text-sm">
+            <Plus size={16} /> Ajouter un patient
+          </button>
+        </div>
+      )}
+
       {/* Patient Cards Grid */}
+      {!loading && filteredPatients.length > 0 && (
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
         {filteredPatients.map((patient) => {
-          const billing = demoBillings.find(
+          const billing = billings.find(
             (b) =>
               b.patientId === patient.id &&
               b.month === new Date().getMonth() + 1
@@ -307,7 +344,7 @@ export default function PatientsPage() {
           );
         })}
       </div>
-
+      )}
       {/* Patient Detail Modal */}
       {selectedPatient && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">

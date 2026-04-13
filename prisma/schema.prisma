@@ -73,6 +73,7 @@ model Session {
   endTime     DateTime @map("end_time")
   notes       String?
   isCompleted Boolean  @default(false) @map("is_completed")
+  isAbsent    Boolean  @default(false) @map("is_absent")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
   patientId   String   @map("patient_id")
