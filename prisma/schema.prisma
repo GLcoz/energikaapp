@@ -1,6 +1,3 @@
-// Prisma Schema for Energika ERP - Orthophonie Center Management
-// Uses monthly subscription (forfait) model, not per-session billing
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,125 +8,109 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// ─── User Roles ─────────────────────────────────────────────────────
-enum Role {
-  ADMIN
-  ORTHO
-}
-
-// ─── Payment Status ─────────────────────────────────────────────────
-enum PaymentStatus {
-  PAID       // Payé
-  PENDING    // En attente
-  PARTIAL    // Partiel
-}
-
-// ─── Expense Category ───────────────────────────────────────────────
-enum ExpenseCategory {
-  LOYER       // Rent
-  SALAIRE     // Salary
-  MATERIEL    // Equipment/Material
-  MARKETING   // Marketing
-  AUTRE       // Other
-}
-
-// ─── Profiles (linked to Supabase Auth) ──────────────────────────────
 model Profile {
-  id        String   @id @default(uuid())
-  authId    String   @unique @map("auth_id") // Supabase Auth user ID
-  firstName String   @map("first_name")
-  lastName  String   @map("last_name")
-  email     String   @unique
-  role      Role     @default(ORTHO)
+  id        String    @id @default(uuid())
+  authId    String    @unique @map("auth_id")
+  firstName String    @map("first_name")
+  lastName  String    @map("last_name")
+  email     String    @unique
+  role      Role      @default(ORTHO)
   phone     String?
-  avatarUrl String?  @map("avatar_url")
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  // Relations
-  patients  Patient[]    // Patients assigned to this therapist
-  sessions  Session[]    // Sessions conducted by this therapist
+  avatarUrl String?   @map("avatar_url")
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  patients  Patient[]
+  sessions  Session[]
 
   @@map("profiles")
 }
 
-// ─── Patient ─────────────────────────────────────────────────────────
 model Patient {
-  id              String    @id @default(uuid())
-  firstName       String    @map("first_name")
-  lastName        String    @map("last_name")
-  dateOfBirth     DateTime? @map("date_of_birth")
-  parentName      String?   @map("parent_name")
-  parentPhone     String    @map("parent_phone")
-  parentEmail     String?   @map("parent_email")
-  monthlyFee      Float     @map("monthly_fee") // Montant du forfait mensuel (ex: 1200 DH)
-  startDate       DateTime  @map("start_date")  // Date de début de prise en charge
-  notes           String?   @db.Text
-  isActive        Boolean   @default(true) @map("is_active")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
-
-  // Relations
-  therapistId     String    @map("therapist_id")
-  therapist       Profile   @relation(fields: [therapistId], references: [id])
-  billings        MonthlyBilling[]
-  sessions        Session[]
+  id          String           @id @default(uuid())
+  firstName   String           @map("first_name")
+  lastName    String           @map("last_name")
+  dateOfBirth DateTime?        @map("date_of_birth")
+  parentName  String?          @map("parent_name")
+  parentPhone String           @map("parent_phone")
+  parentEmail String?          @map("parent_email")
+  monthlyFee  Float            @map("monthly_fee")
+  startDate   DateTime         @map("start_date")
+  notes       String?
+  isActive    Boolean          @default(true) @map("is_active")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+  therapistId String           @map("therapist_id")
+  billings    MonthlyBilling[]
+  therapist   Profile          @relation(fields: [therapistId], references: [id])
+  sessions    Session[]
 
   @@map("patients")
 }
 
-// ─── Monthly Billing (Subscription Tracking) ─────────────────────────
 model MonthlyBilling {
-  id          String        @id @default(uuid())
-  month       Int           // 1-12
-  year        Int
-  status      PaymentStatus @default(PENDING)
-  amountDue   Float         @map("amount_due")   // Montant dû (from patient's monthlyFee)
-  amountPaid  Float         @default(0) @map("amount_paid") // Montant payé
-  paidAt      DateTime?     @map("paid_at")       // When payment was received
-  notes       String?
-  createdAt   DateTime      @default(now()) @map("created_at")
-  updatedAt   DateTime      @updatedAt @map("updated_at")
+  id         String        @id @default(uuid())
+  month      Int
+  year       Int
+  status     PaymentStatus @default(PENDING)
+  amountDue  Float         @map("amount_due")
+  amountPaid Float         @default(0) @map("amount_paid")
+  paidAt     DateTime?     @map("paid_at")
+  notes      String?
+  createdAt  DateTime      @default(now()) @map("created_at")
+  updatedAt  DateTime      @updatedAt @map("updated_at")
+  patientId  String        @map("patient_id")
+  patient    Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
-  // Relations
-  patientId   String        @map("patient_id")
-  patient     Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
-
-  @@unique([patientId, month, year]) // One billing per patient per month
+  @@unique([patientId, month, year])
   @@map("monthly_billings")
 }
 
-// ─── Session (Calendar Events) ───────────────────────────────────────
 model Session {
   id          String   @id @default(uuid())
   title       String
   startTime   DateTime @map("start_time")
   endTime     DateTime @map("end_time")
-  notes       String?  @db.Text
+  notes       String?
   isCompleted Boolean  @default(false) @map("is_completed")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
-
-  // Relations
   patientId   String   @map("patient_id")
-  patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
   therapistId String   @map("therapist_id")
+  patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
   therapist   Profile  @relation(fields: [therapistId], references: [id])
 
   @@map("sessions")
 }
 
-// ─── Expenses ────────────────────────────────────────────────────────
 model Expense {
   id          String          @id @default(uuid())
   title       String
   category    ExpenseCategory
   amount      Float
   date        DateTime
-  description String?         @db.Text
+  description String?
   createdAt   DateTime        @default(now()) @map("created_at")
   updatedAt   DateTime        @updatedAt @map("updated_at")
 
   @@map("expenses")
+}
+
+enum Role {
+  ADMIN
+  ORTHO
+}
+
+enum PaymentStatus {
+  PAID
+  PENDING
+  PARTIAL
+}
+
+enum ExpenseCategory {
+  LOYER
+  SALAIRE
+  MATERIEL
+  MARKETING
+  AUTRE
 }

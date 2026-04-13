@@ -12,17 +12,28 @@ import {
   Trash2,
   Eye,
   X,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { demoPatients, demoBillings } from "@/lib/demo-data";
-import type { Patient, User } from "@/lib/types";
+import { demoPatients, demoBillings, demoSessions } from "@/lib/demo-data";
+import type { Patient, Session, User } from "@/lib/types";
 
 export default function PatientsPage() {
   const [user, setUser] = useState<User | null>(null);
   const [patients, setPatients] = useState<Patient[]>(demoPatients);
+  const [sessions, setSessions] = useState<Session[]>(demoSessions);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [openSessionId, setOpenSessionId] = useState<string | null>(null);
+  const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
+  const [editCoordinates, setEditCoordinates] = useState({
+    parentName: "",
+    parentPhone: "",
+    parentEmail: "",
+  });
   const [newPatient, setNewPatient] = useState({
     firstName: "",
     lastName: "",
@@ -37,6 +48,30 @@ export default function PatientsPage() {
   useEffect(() => {
     const stored = localStorage.getItem("energika_user");
     if (stored) setUser(JSON.parse(stored));
+
+    const loadData = async () => {
+      try {
+        const [patientsRes, sessionsRes] = await Promise.all([
+          fetch("/api/patients", { cache: "no-store" }),
+          fetch("/api/sessions", { cache: "no-store" }),
+        ]);
+
+        if (patientsRes.ok) {
+          const patientsData = (await patientsRes.json()) as Patient[];
+          setPatients(patientsData);
+        }
+
+        if (sessionsRes.ok) {
+          const sessionsData = (await sessionsRes.json()) as Session[];
+          setSessions(sessionsData);
+        }
+      } catch {
+        setPatients(demoPatients);
+        setSessions(demoSessions);
+      }
+    };
+
+    void loadData();
   }, []);
 
   const isOrtho = String(user?.role ?? "").toUpperCase() === "ORTHO";
@@ -49,33 +84,96 @@ export default function PatientsPage() {
       p.parentPhone.includes(searchTerm)
   );
 
-  const handleAddPatient = (e: React.FormEvent) => {
+  const handleAddPatient = async (e: React.FormEvent) => {
     e.preventDefault();
-    const patient: Patient = {
-      id: `p${Date.now()}`,
-      ...newPatient,
-      isActive: true,
-      therapistId: user?.id || "2",
-      createdAt: new Date().toISOString(),
-    };
-    setPatients([...patients, patient]);
-    setShowAddModal(false);
-    setNewPatient({
-      firstName: "",
-      lastName: "",
-      parentName: "",
-      parentPhone: "",
-      parentEmail: "",
-      monthlyFee: 1200,
-      startDate: new Date().toISOString().split("T")[0],
-      notes: "",
-    });
+    try {
+      const response = await fetch("/api/patients", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...newPatient,
+          therapistId: user?.id,
+        }),
+      });
+
+      if (!response.ok) return;
+
+      const created = (await response.json()) as Patient;
+      setPatients((prev) => [created, ...prev]);
+      setShowAddModal(false);
+      setNewPatient({
+        firstName: "",
+        lastName: "",
+        parentName: "",
+        parentPhone: "",
+        parentEmail: "",
+        monthlyFee: 1200,
+        startDate: new Date().toISOString().split("T")[0],
+        notes: "",
+      });
+    } catch {
+      // keep UI unchanged on network/server error
+    }
   };
 
-  const handleDeletePatient = (id: string) => {
+  const handleDeletePatient = async (id: string) => {
     if (confirm("Êtes-vous sûr de vouloir supprimer ce patient ?")) {
-      setPatients(patients.filter((p) => p.id !== id));
-      if (selectedPatient?.id === id) setSelectedPatient(null);
+      try {
+        const response = await fetch(`/api/patients/${id}`, {
+          method: "DELETE",
+        });
+
+        if (!response.ok) return;
+
+        setPatients((prev) => prev.filter((p) => p.id !== id));
+        if (selectedPatient?.id === id) setSelectedPatient(null);
+        if (editingPatient?.id === id) {
+          setEditingPatient(null);
+          setShowEditModal(false);
+        }
+      } catch {
+        // keep UI unchanged on network/server error
+      }
+    }
+  };
+
+  const openEditCoordinatesModal = (patient: Patient) => {
+    setEditingPatient(patient);
+    setEditCoordinates({
+      parentName: patient.parentName ?? "",
+      parentPhone: patient.parentPhone,
+      parentEmail: patient.parentEmail ?? "",
+    });
+    setShowEditModal(true);
+  };
+
+  const handleUpdateCoordinates = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPatient) return;
+
+    try {
+      const response = await fetch(`/api/patients/${editingPatient.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editCoordinates),
+      });
+
+      if (!response.ok) return;
+
+      const updated = (await response.json()) as Patient;
+
+      setPatients((prev) =>
+        prev.map((patient) => (patient.id === editingPatient.id ? updated : patient))
+      );
+
+      if (selectedPatient?.id === editingPatient.id) {
+        setSelectedPatient(updated);
+      }
+
+      setShowEditModal(false);
+      setEditingPatient(null);
+    } catch {
+      // keep UI unchanged on network/server error
     }
   };
 
@@ -193,7 +291,10 @@ export default function PatientsPage() {
                   <Eye size={14} />
                   Voir
                 </button>
-                <button className="btn btn-secondary text-xs py-2 px-3">
+                <button
+                  onClick={() => openEditCoordinatesModal(patient)}
+                  className="btn btn-secondary text-xs py-2 px-3"
+                >
                   <Edit2 size={14} />
                 </button>
                 <button
@@ -269,6 +370,77 @@ export default function PatientsPage() {
                   <p className="text-sm">{selectedPatient.notes}</p>
                 </div>
               )}
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-semibold text-[var(--color-text-primary)]">
+                    Séances (accordéon)
+                  </p>
+                  <button
+                    onClick={() => openEditCoordinatesModal(selectedPatient)}
+                    className="btn btn-secondary text-xs py-2 px-3"
+                  >
+                    <Edit2 size={14} />
+                    Modifier coordonnées
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {sessions
+                    .filter((session) => session.patientId === selectedPatient.id)
+                    .sort(
+                      (a, b) =>
+                        new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+                    )
+                    .map((session) => {
+                      const isOpen = openSessionId === session.id;
+                      return (
+                        <div
+                          key={session.id}
+                          className="rounded-xl border border-[var(--color-border-light)]"
+                        >
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setOpenSessionId((prev) =>
+                                prev === session.id ? null : session.id
+                              )
+                            }
+                            className="w-full p-3 flex items-center justify-between text-left"
+                          >
+                            <div>
+                              <p className="text-sm font-medium text-[var(--color-text-primary)]">
+                                {new Date(session.startTime).toLocaleString("fr-FR", {
+                                  day: "2-digit",
+                                  month: "short",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </p>
+                              <p className="text-xs text-[var(--color-text-muted)]">
+                                {session.isCompleted ? "Terminée" : "Planifiée"}
+                              </p>
+                            </div>
+                            {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                          </button>
+
+                          {isOpen && (
+                            <div className="px-3 pb-3 text-sm text-[var(--color-text-secondary)] border-t border-[var(--color-border-light)] pt-2">
+                              {session.notes || "Aucune note sur cette séance."}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                  {sessions.filter((session) => session.patientId === selectedPatient.id)
+                    .length === 0 && (
+                    <p className="text-sm text-[var(--color-text-muted)]">
+                      Aucune séance pour ce patient.
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
 
             <div className="mt-6 flex gap-3">
@@ -289,6 +461,97 @@ export default function PatientsPage() {
                 </a>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {showEditModal && editingPatient && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 fade-in">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-[var(--color-text-primary)]">
+                Modifier coordonnées
+              </h2>
+              <button
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditingPatient(null);
+                }}
+                className="p-2 rounded-lg hover:bg-[var(--color-bg-tertiary)]"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateCoordinates} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                  Nom du parent
+                </label>
+                <input
+                  type="text"
+                  value={editCoordinates.parentName}
+                  onChange={(e) =>
+                    setEditCoordinates((prev) => ({
+                      ...prev,
+                      parentName: e.target.value,
+                    }))
+                  }
+                  className="w-full px-3 py-2.5 rounded-lg border border-[var(--color-border-default)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                  Téléphone parent *
+                </label>
+                <input
+                  type="tel"
+                  required
+                  value={editCoordinates.parentPhone}
+                  onChange={(e) =>
+                    setEditCoordinates((prev) => ({
+                      ...prev,
+                      parentPhone: e.target.value,
+                    }))
+                  }
+                  className="w-full px-3 py-2.5 rounded-lg border border-[var(--color-border-default)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                  Email parent
+                </label>
+                <input
+                  type="email"
+                  value={editCoordinates.parentEmail}
+                  onChange={(e) =>
+                    setEditCoordinates((prev) => ({
+                      ...prev,
+                      parentEmail: e.target.value,
+                    }))
+                  }
+                  className="w-full px-3 py-2.5 rounded-lg border border-[var(--color-border-default)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingPatient(null);
+                  }}
+                  className="flex-1 btn btn-secondary"
+                >
+                  Annuler
+                </button>
+                <button type="submit" className="flex-1 btn btn-primary">
+                  Enregistrer
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { Calendar as CalendarIcon, Plus, X, Clock, User as UserIcon } from "lucide-react";
+import { Calendar as CalendarIcon, Plus, X, ChevronDown, ChevronUp } from "lucide-react";
 import { demoSessions, demoPatients, demoBillings } from "@/lib/demo-data";
 import type { Session, Patient, User } from "@/lib/types";
 
@@ -24,10 +24,11 @@ import listPlugin from "@fullcalendar/list";
 
 export default function CalendrierPage() {
   const [user, setUser] = useState<User | null>(null);
+  const [patients, setPatients] = useState<Patient[]>(demoPatients);
   const [sessions, setSessions] = useState<Session[]>(demoSessions);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedEvent, setSelectedEvent] = useState<Session | null>(null);
+  const [openSessionId, setOpenSessionId] = useState<string | null>(null);
   const [newSession, setNewSession] = useState({
     patientId: "",
     startTime: "",
@@ -38,13 +39,37 @@ export default function CalendrierPage() {
   useEffect(() => {
     const stored = localStorage.getItem("energika_user");
     if (stored) setUser(JSON.parse(stored));
+
+    const loadData = async () => {
+      try {
+        const [patientsRes, sessionsRes] = await Promise.all([
+          fetch("/api/patients", { cache: "no-store" }),
+          fetch("/api/sessions", { cache: "no-store" }),
+        ]);
+
+        if (patientsRes.ok) {
+          const patientsData = (await patientsRes.json()) as Patient[];
+          setPatients(patientsData);
+        }
+
+        if (sessionsRes.ok) {
+          const sessionsData = (await sessionsRes.json()) as Session[];
+          setSessions(sessionsData);
+        }
+      } catch {
+        setPatients(demoPatients);
+        setSessions(demoSessions);
+      }
+    };
+
+    void loadData();
   }, []);
 
   const currentMonth = new Date().getMonth() + 1;
 
   // Transform sessions to FullCalendar events
   const events = sessions.map((session) => {
-    const patient = demoPatients.find((p) => p.id === session.patientId);
+    const patient = patients.find((p) => p.id === session.patientId);
     const billing = demoBillings.find(
       (b) => b.patientId === session.patientId && b.month === currentMonth
     );
@@ -77,7 +102,6 @@ export default function CalendrierPage() {
   });
 
   const handleDateClick = (info: { dateStr: string }) => {
-    setSelectedDate(info.dateStr);
     setNewSession({
       patientId: "",
       startTime: `${info.dateStr}T09:00`,
@@ -92,33 +116,90 @@ export default function CalendrierPage() {
     if (session) setSelectedEvent(session);
   };
 
-  const handleAddSession = (e: React.FormEvent) => {
+  const handleAddSession = async (e: React.FormEvent) => {
     e.preventDefault();
-    const patient = demoPatients.find((p) => p.id === newSession.patientId);
+    const patient = patients.find((p) => p.id === newSession.patientId);
     if (!patient) return;
+    if (new Date(newSession.endTime) <= new Date(newSession.startTime)) return;
 
-    const session: Session = {
-      id: `s${Date.now()}`,
-      title: `Séance - ${patient.firstName} ${patient.lastName}`,
-      startTime: newSession.startTime,
-      endTime: newSession.endTime,
-      notes: newSession.notes,
-      isCompleted: false,
-      patientId: newSession.patientId,
-      therapistId: user?.id || "2",
-    };
-    setSessions([...sessions, session]);
-    setShowAddModal(false);
+    try {
+      const response = await fetch("/api/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: `Séance - ${patient.firstName} ${patient.lastName}`,
+          startTime: newSession.startTime,
+          endTime: newSession.endTime,
+          notes: newSession.notes,
+          patientId: newSession.patientId,
+          therapistId: user?.id,
+        }),
+      });
+
+      if (!response.ok) return;
+
+      const created = (await response.json()) as Session;
+      setSessions((prev) =>
+        [...prev, created].sort(
+          (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+        )
+      );
+      setShowAddModal(false);
+    } catch {
+      // keep UI unchanged on network/server error
+    }
   };
 
-  const toggleComplete = (sessionId: string) => {
-    setSessions(
-      sessions.map((s) =>
-        s.id === sessionId ? { ...s, isCompleted: !s.isCompleted } : s
-      )
-    );
-    setSelectedEvent(null);
+  const toggleComplete = async (sessionId: string) => {
+    const target = sessions.find((s) => s.id === sessionId);
+    if (!target) return;
+
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isCompleted: !target.isCompleted }),
+      });
+
+      if (!response.ok) return;
+
+      const updated = (await response.json()) as Session;
+      setSessions((prev) => prev.map((s) => (s.id === sessionId ? updated : s)));
+      setSelectedEvent(null);
+    } catch {
+      // keep UI unchanged on network/server error
+    }
   };
+
+  const handleSessionMoveOrResize = async (info: {
+    event: { id: string; start: Date | null; end: Date | null };
+  }) => {
+    if (!info.event.start || !info.event.end) return;
+
+    try {
+      const response = await fetch(`/api/sessions/${info.event.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          startTime: info.event.start.toISOString(),
+          endTime: info.event.end.toISOString(),
+        }),
+      });
+
+      if (!response.ok) return;
+
+      const updated = (await response.json()) as Session;
+      setSessions((prev) =>
+        prev.map((session) => (session.id === info.event.id ? updated : session))
+      );
+    } catch {
+      // keep UI unchanged on network/server error
+    }
+  };
+
+  const orderedSessions = [...sessions].sort(
+    (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+  );
 
   return (
     <div className="space-y-6 fade-in">
@@ -137,7 +218,6 @@ export default function CalendrierPage() {
         </div>
         <button
           onClick={() => {
-            setSelectedDate(new Date().toISOString().split("T")[0]);
             setNewSession({
               patientId: "",
               startTime: `${new Date().toISOString().split("T")[0]}T09:00`,
@@ -183,6 +263,8 @@ export default function CalendrierPage() {
           events={events}
           dateClick={handleDateClick}
           eventClick={handleEventClick}
+          eventDrop={handleSessionMoveOrResize}
+          eventResize={handleSessionMoveOrResize}
           editable={true}
           selectable={true}
           dayMaxEvents={3}
@@ -208,6 +290,76 @@ export default function CalendrierPage() {
         />
       </div>
 
+      <div className="card p-4 lg:p-6">
+        <h2 className="text-lg font-semibold text-[var(--color-text-primary)] mb-4">
+          Séances (accordéon)
+        </h2>
+
+        <div className="space-y-3">
+          {orderedSessions.length === 0 && (
+            <p className="text-sm text-[var(--color-text-muted)]">
+              Aucune séance planifiée.
+            </p>
+          )}
+
+          {orderedSessions.map((session) => {
+            const patient = patients.find((p) => p.id === session.patientId);
+            const isOpen = openSessionId === session.id;
+
+            return (
+              <div
+                key={session.id}
+                className="rounded-xl border border-[var(--color-border-light)] bg-white"
+              >
+                <button
+                  type="button"
+                  onClick={() =>
+                    setOpenSessionId((prev) => (prev === session.id ? null : session.id))
+                  }
+                  className="w-full flex items-center justify-between gap-3 p-4 text-left"
+                >
+                  <div>
+                    <p className="font-medium text-[var(--color-text-primary)]">
+                      {patient?.firstName} {patient?.lastName}
+                    </p>
+                    <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
+                      {new Date(session.startTime).toLocaleString("fr-FR", {
+                        weekday: "short",
+                        day: "2-digit",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className={`badge ${session.isCompleted ? "badge-success" : "badge-info"}`}>
+                      {session.isCompleted ? "Terminée" : "Planifiée"}
+                    </span>
+                    {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </div>
+                </button>
+
+                {isOpen && (
+                  <div className="px-4 pb-4 pt-1 border-t border-[var(--color-border-light)] space-y-3">
+                    <p className="text-sm text-[var(--color-text-secondary)]">
+                      {session.notes || "Aucune note pour cette séance."}
+                    </p>
+                    <button
+                      onClick={() => toggleComplete(session.id)}
+                      className={`btn ${session.isCompleted ? "btn-secondary" : "btn-primary"}`}
+                    >
+                      {session.isCompleted ? "Marquer non terminée" : "Marquer terminée"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Event Detail Modal */}
       {selectedEvent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
@@ -225,7 +377,7 @@ export default function CalendrierPage() {
             </div>
 
             {(() => {
-              const patient = demoPatients.find(
+              const patient = patients.find(
                 (p) => p.id === selectedEvent.patientId
               );
               return (
@@ -329,7 +481,7 @@ export default function CalendrierPage() {
                   className="w-full px-3 py-2.5 rounded-lg border border-[var(--color-border-default)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 bg-white"
                 >
                   <option value="">Sélectionner un patient...</option>
-                  {demoPatients.map((p) => (
+                  {patients.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.firstName} {p.lastName}
                     </option>
