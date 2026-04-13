@@ -27,6 +27,7 @@ export default function CalendrierPage() {
   const [patients, setPatients] = useState<Patient[]>(demoPatients);
   const [sessions, setSessions] = useState<Session[]>(demoSessions);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [addSessionError, setAddSessionError] = useState("");
   const [selectedEvent, setSelectedEvent] = useState<Session | null>(null);
   const [openSessionId, setOpenSessionId] = useState<string | null>(null);
   const [newSession, setNewSession] = useState({
@@ -102,6 +103,7 @@ export default function CalendrierPage() {
   });
 
   const handleDateClick = (info: { dateStr: string }) => {
+    setAddSessionError("");
     setNewSession({
       patientId: "",
       startTime: `${info.dateStr}T09:00`,
@@ -118,9 +120,16 @@ export default function CalendrierPage() {
 
   const handleAddSession = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAddSessionError("");
     const patient = patients.find((p) => p.id === newSession.patientId);
-    if (!patient) return;
-    if (new Date(newSession.endTime) <= new Date(newSession.startTime)) return;
+    if (!patient) {
+      setAddSessionError("Veuillez sélectionner un patient.");
+      return;
+    }
+    if (new Date(newSession.endTime) <= new Date(newSession.startTime)) {
+      setAddSessionError("L'heure de fin doit être après l'heure de début.");
+      return;
+    }
 
     try {
       const response = await fetch("/api/sessions", {
@@ -133,10 +142,20 @@ export default function CalendrierPage() {
           notes: newSession.notes,
           patientId: newSession.patientId,
           therapistId: user?.id,
+          therapistEmail: user?.email,
+          therapistFirstName: user?.firstName,
+          therapistLastName: user?.lastName,
+          therapistRole: user?.role,
         }),
       });
 
-      if (!response.ok) return;
+      if (!response.ok) {
+        const errorData = (await response.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+        setAddSessionError(errorData?.error || "Impossible de créer la séance.");
+        return;
+      }
 
       const created = (await response.json()) as Session;
       setSessions((prev) =>
@@ -146,7 +165,7 @@ export default function CalendrierPage() {
       );
       setShowAddModal(false);
     } catch {
-      // keep UI unchanged on network/server error
+      setAddSessionError("Erreur réseau. Veuillez réessayer.");
     }
   };
 
@@ -218,6 +237,7 @@ export default function CalendrierPage() {
         </div>
         <button
           onClick={() => {
+            setAddSessionError("");
             setNewSession({
               patientId: "",
               startTime: `${new Date().toISOString().split("T")[0]}T09:00`,
@@ -468,6 +488,12 @@ export default function CalendrierPage() {
             </div>
 
             <form onSubmit={handleAddSession} className="space-y-4">
+              {addSessionError && (
+                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  {addSessionError}
+                </p>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
                   Patient *

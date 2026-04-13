@@ -36,17 +36,73 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
+    if (!body?.patientId || !body?.startTime || !body?.endTime) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    const rawTherapistId =
+      typeof body.therapistId === "string" ? body.therapistId.trim() : "";
+
+    const providedProfile = rawTherapistId
+      ? await prisma.profile.findFirst({
+          where: {
+            OR: [{ id: rawTherapistId }, { authId: rawTherapistId }],
+          },
+          select: { id: true },
+        })
+      : null;
+
     const relatedPatient = await prisma.patient.findUnique({
       where: { id: body.patientId },
       select: { therapistId: true, firstName: true, lastName: true },
     });
+
+    if (!relatedPatient) {
+      return NextResponse.json({ error: "Patient not found" }, { status: 400 });
+    }
 
     const fallbackProfile = await prisma.profile.findFirst({
       select: { id: true },
       orderBy: { createdAt: "asc" },
     });
 
-    const therapistId = body.therapistId || relatedPatient?.therapistId || fallbackProfile?.id;
+    let therapistId =
+      providedProfile?.id || relatedPatient.therapistId || fallbackProfile?.id;
+
+    if (!therapistId && rawTherapistId) {
+      const therapistEmail =
+        typeof body.therapistEmail === "string" && body.therapistEmail.trim()
+          ? body.therapistEmail.trim().toLowerCase()
+          : `${rawTherapistId}@local.energika`;
+      const therapistFirstName =
+        typeof body.therapistFirstName === "string" && body.therapistFirstName.trim()
+          ? body.therapistFirstName.trim()
+          : "Therapeute";
+      const therapistLastName =
+        typeof body.therapistLastName === "string" ? body.therapistLastName.trim() : "";
+      const therapistRole = body.therapistRole === "ADMIN" ? "ADMIN" : "ORTHO";
+
+      const createdProfile = await prisma.profile.upsert({
+        where: { authId: rawTherapistId },
+        update: {
+          email: therapistEmail,
+          firstName: therapistFirstName,
+          lastName: therapistLastName,
+          role: therapistRole,
+        },
+        create: {
+          authId: rawTherapistId,
+          email: therapistEmail,
+          firstName: therapistFirstName,
+          lastName: therapistLastName,
+          role: therapistRole,
+        },
+        select: { id: true },
+      });
+
+      therapistId = createdProfile.id;
+    }
+
     if (!therapistId) {
       return NextResponse.json(
         { error: "No therapist profile found to attach session" },

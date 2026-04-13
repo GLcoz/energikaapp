@@ -40,7 +40,6 @@ export async function PATCH(
       data: {
         parentName: body.parentName ?? null,
         parentPhone: body.parentPhone,
-        parentEmail: body.parentEmail ?? null,
       },
     });
 

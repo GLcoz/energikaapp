@@ -117,7 +117,7 @@ export async function POST(request: Request) {
         lastName: body.lastName,
         parentName: body.parentName || null,
         parentPhone: body.parentPhone,
-        parentEmail: body.parentEmail || null,
+        parentEmail: null,
         monthlyFee: Number(body.monthlyFee ?? 0),
         startDate: new Date(body.startDate),
         notes: body.notes || null,

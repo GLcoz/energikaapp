@@ -6,7 +6,6 @@ import {
   Plus,
   Search,
   Phone,
-  Mail,
   Calendar,
   Edit2,
   Trash2,
@@ -32,14 +31,12 @@ export default function PatientsPage() {
   const [editCoordinates, setEditCoordinates] = useState({
     parentName: "",
     parentPhone: "",
-    parentEmail: "",
   });
   const [newPatient, setNewPatient] = useState({
     firstName: "",
     lastName: "",
     parentName: "",
     parentPhone: "",
-    parentEmail: "",
     monthlyFee: 1200,
     startDate: new Date().toISOString().split("T")[0],
     notes: "",
@@ -110,7 +107,6 @@ export default function PatientsPage() {
         lastName: "",
         parentName: "",
         parentPhone: "",
-        parentEmail: "",
         monthlyFee: 1200,
         startDate: new Date().toISOString().split("T")[0],
         notes: "",
@@ -146,7 +142,6 @@ export default function PatientsPage() {
     setEditCoordinates({
       parentName: patient.parentName ?? "",
       parentPhone: patient.parentPhone,
-      parentEmail: patient.parentEmail ?? "",
     });
     setShowEditModal(true);
   };
@@ -455,15 +450,6 @@ export default function PatientsPage() {
                 <Phone size={16} />
                 Appeler
               </a>
-              {selectedPatient.parentEmail && (
-                <a
-                  href={`mailto:${selectedPatient.parentEmail}`}
-                  className="flex-1 btn btn-secondary"
-                >
-                  <Mail size={16} />
-                  Email
-                </a>
-              )}
             </div>
           </div>
         </div>
@@ -517,23 +503,6 @@ export default function PatientsPage() {
                     setEditCoordinates((prev) => ({
                       ...prev,
                       parentPhone: e.target.value,
-                    }))
-                  }
-                  className="w-full px-3 py-2.5 rounded-lg border border-[var(--color-border-default)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
-                  Email parent
-                </label>
-                <input
-                  type="email"
-                  value={editCoordinates.parentEmail}
-                  onChange={(e) =>
-                    setEditCoordinates((prev) => ({
-                      ...prev,
-                      parentEmail: e.target.value,
                     }))
                   }
                   className="w-full px-3 py-2.5 rounded-lg border border-[var(--color-border-default)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
@@ -625,7 +594,7 @@ export default function PatientsPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div>
                 <div>
                   <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
                     Téléphone parent *
@@ -639,20 +608,6 @@ export default function PatientsPage() {
                     }
                     className="w-full px-3 py-2.5 rounded-lg border border-[var(--color-border-default)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
                     placeholder="06XXXXXXXX"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
-                    Email parent
-                  </label>
-                  <input
-                    type="email"
-                    value={newPatient.parentEmail}
-                    onChange={(e) =>
-                      setNewPatient({ ...newPatient, parentEmail: e.target.value })
-                    }
-                    className="w-full px-3 py-2.5 rounded-lg border border-[var(--color-border-default)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
-                    placeholder="email@exemple.com"
                   />
                 </div>
               </div>
