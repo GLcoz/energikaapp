@@ -33,6 +33,7 @@ export default function CalendrierPage() {
     patientId: "",
     startTime: "",
     endTime: "",
+    room: "",
     notes: "",
   });
 
@@ -79,11 +80,14 @@ export default function CalendrierPage() {
       ? "#059669"
       : "#1e40af";
 
+    const roomLabel = session.room ? ` [${session.room}]` : "";
+    const nameLabel = `${patient?.firstName} ${patient?.lastName}`;
+
     return {
       id: session.id,
       title: session.isAbsent
-        ? `🚫 ${patient?.firstName} ${patient?.lastName}`
-        : `${patient?.firstName} ${patient?.lastName}`,
+        ? `🚫 ${nameLabel}${roomLabel}`
+        : `${nameLabel}${roomLabel}`,
       start: session.startTime,
       end: session.endTime,
       backgroundColor: bgColor,
@@ -94,6 +98,7 @@ export default function CalendrierPage() {
         patientId: session.patientId,
         isCompleted: session.isCompleted,
         isAbsent: session.isAbsent,
+        room: session.room,
         notes: session.notes,
       },
     };
@@ -116,6 +121,7 @@ export default function CalendrierPage() {
       patientId: "",
       startTime: localStart,
       endTime: localEnd,
+      room: "",
       notes: "",
     });
     setShowAddModal(true);
@@ -147,6 +153,7 @@ export default function CalendrierPage() {
           title: `Séance - ${patient.firstName} ${patient.lastName}`,
           startTime: new Date(newSession.startTime).toISOString(),
           endTime: new Date(newSession.endTime).toISOString(),
+          room: newSession.room || null,
           notes: newSession.notes,
           patientId: newSession.patientId,
           therapistId: user?.id,
@@ -274,6 +281,7 @@ export default function CalendrierPage() {
               patientId: "",
               startTime: `${today}T09:00`,
               endTime: `${today}T09:45`,
+              room: "",
               notes: "",
             });
             setShowAddModal(true);
@@ -321,6 +329,8 @@ export default function CalendrierPage() {
           selectable={true}
           dayMaxEvents={3}
           height="800px"
+          slotEventOverlap={true}
+          eventOverlap={true}
           buttonText={{
             today: "Aujourd'hui",
             month: "Mois",
@@ -337,7 +347,7 @@ export default function CalendrierPage() {
           expandRows={true}
           nowIndicator={true}
           businessHours={{
-            daysOfWeek: [1, 2, 3, 4, 5, 6], // Lundi - Samedi
+            daysOfWeek: [1, 2, 3, 4, 5, 6],
             startTime: "09:00",
             endTime: "19:00",
           }}
@@ -386,6 +396,11 @@ export default function CalendrierPage() {
                   <div>
                     <p className="font-medium text-[var(--color-text-primary)]">
                       {patient?.firstName} {patient?.lastName}
+                      {session.room && (
+                        <span className="ml-2 text-xs font-normal bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
+                          Salle {session.room}
+                        </span>
+                      )}
                     </p>
                     <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
                       {new Date(session.startTime).toLocaleString("fr-FR", {
@@ -507,6 +522,13 @@ export default function CalendrierPage() {
                     </div>
                   </div>
 
+                  {selectedEvent.room && (
+                    <div className="p-3 rounded-lg bg-blue-50 border border-blue-100">
+                      <p className="text-xs text-blue-600 font-medium">Salle</p>
+                      <p className="text-sm font-bold text-blue-800">{selectedEvent.room}</p>
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-2">
                     {selectedEvent.isAbsent && (
                       <span className="badge" style={{ background: "#fed7aa", color: "#c2410c" }}>
@@ -627,6 +649,21 @@ export default function CalendrierPage() {
                     className="w-full px-3 py-2.5 rounded-lg border border-[var(--color-border-default)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                  Salle
+                </label>
+                <input
+                  type="text"
+                  value={newSession.room}
+                  onChange={(e) =>
+                    setNewSession({ ...newSession, room: e.target.value })
+                  }
+                  className="w-full px-3 py-2.5 rounded-lg border border-[var(--color-border-default)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
+                  placeholder="Ex: 1, 2, A, B..."
+                />
               </div>
 
               <div>

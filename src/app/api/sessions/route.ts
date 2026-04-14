@@ -6,6 +6,7 @@ function mapSession(session: {
   title: string;
   startTime: Date;
   endTime: Date;
+  room: string | null;
   notes: string | null;
   isCompleted: boolean;
   isAbsent: boolean;
@@ -16,6 +17,7 @@ function mapSession(session: {
     ...session,
     startTime: session.startTime.toISOString(),
     endTime: session.endTime.toISOString(),
+    room: session.room ?? undefined,
     notes: session.notes ?? undefined,
   };
 }
@@ -122,6 +124,7 @@ export async function POST(request: Request) {
         title,
         startTime: new Date(body.startTime),
         endTime: new Date(body.endTime),
+        room: body.room || null,
         notes: body.notes || null,
         isCompleted: false,
         patientId: body.patientId,

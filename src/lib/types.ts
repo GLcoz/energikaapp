@@ -56,6 +56,7 @@ export interface Session {
   title: string;
   startTime: string;
   endTime: string;
+  room?: string;
   notes?: string;
   isCompleted: boolean;
   isAbsent: boolean;

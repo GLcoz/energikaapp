@@ -6,6 +6,7 @@ function mapSession(session: {
   title: string;
   startTime: Date;
   endTime: Date;
+  room: string | null;
   notes: string | null;
   isCompleted: boolean;
   isAbsent: boolean;
@@ -16,6 +17,7 @@ function mapSession(session: {
     ...session,
     startTime: session.startTime.toISOString(),
     endTime: session.endTime.toISOString(),
+    room: session.room ?? undefined,
     notes: session.notes ?? undefined,
   };
 }
@@ -37,6 +39,7 @@ export async function PATCH(
           typeof body.isAbsent === "boolean" ? body.isAbsent : undefined,
         startTime: body.startTime ? new Date(body.startTime) : undefined,
         endTime: body.endTime ? new Date(body.endTime) : undefined,
+        room: typeof body.room === "string" ? (body.room || null) : undefined,
         notes: typeof body.notes === "string" ? body.notes : undefined,
       },
     });

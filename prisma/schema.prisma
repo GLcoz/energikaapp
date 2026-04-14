@@ -71,6 +71,7 @@ model Session {
   title       String
   startTime   DateTime @map("start_time")
   endTime     DateTime @map("end_time")
+  room        String?
   notes       String?
   isCompleted Boolean  @default(false) @map("is_completed")
   isAbsent    Boolean  @default(false) @map("is_absent")
