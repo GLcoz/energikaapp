@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { Calendar as CalendarIcon, Plus, X, ChevronDown, ChevronUp, UserX } from "lucide-react";
+import { Calendar as CalendarIcon, Plus, X, ChevronDown, ChevronUp, UserX, Edit2, Trash2 } from "lucide-react";
 import type { Session, Patient, User } from "@/lib/types";
 
 // Dynamic import FullCalendar to avoid SSR issues
@@ -36,6 +36,16 @@ export default function CalendrierPage() {
     room: "",
     notes: "",
   });
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editSession, setEditSession] = useState({
+    id: "",
+    patientId: "",
+    startTime: "",
+    endTime: "",
+    room: "",
+    notes: "",
+  });
+  const [editSessionError, setEditSessionError] = useState("");
 
   useEffect(() => {
     const stored = localStorage.getItem("energika_user");
@@ -213,7 +223,6 @@ export default function CalendrierPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           isAbsent: !target.isAbsent,
-          // If marking absent, also unmark completed
           isCompleted: target.isAbsent ? target.isCompleted : false,
         }),
       });
@@ -223,6 +232,69 @@ export default function CalendrierPage() {
       setSelectedEvent(updated);
     } catch {
       // keep UI unchanged on network/server error
+    }
+  };
+
+  const openEditModal = (session: Session) => {
+    const offset = new Date(session.startTime).getTimezoneOffset() * 60000;
+    const toLocal = (iso: string) =>
+      new Date(new Date(iso).getTime() - offset).toISOString().slice(0, 16);
+    setEditSession({
+      id: session.id,
+      patientId: session.patientId,
+      startTime: toLocal(session.startTime),
+      endTime: toLocal(session.endTime),
+      room: session.room ?? "",
+      notes: session.notes ?? "",
+    });
+    setEditSessionError("");
+    setShowEditModal(true);
+    setSelectedEvent(null);
+  };
+
+  const handleUpdateSession = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEditSessionError("");
+    if (new Date(editSession.endTime) <= new Date(editSession.startTime)) {
+      setEditSessionError("L'heure de fin doit être après l'heure de début.");
+      return;
+    }
+    try {
+      const patient = patients.find((p) => p.id === editSession.patientId);
+      const response = await fetch(`/api/sessions/${editSession.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: patient ? `Séance - ${patient.firstName} ${patient.lastName}` : undefined,
+          startTime: new Date(editSession.startTime).toISOString(),
+          endTime: new Date(editSession.endTime).toISOString(),
+          room: editSession.room || null,
+          notes: editSession.notes,
+          patientId: editSession.patientId,
+        }),
+      });
+      if (!response.ok) {
+        const err = (await response.json().catch(() => null)) as { error?: string } | null;
+        setEditSessionError(err?.error || "Impossible de modifier la séance.");
+        return;
+      }
+      const updated = (await response.json()) as Session;
+      setSessions((prev) => prev.map((s) => (s.id === editSession.id ? updated : s)));
+      setShowEditModal(false);
+    } catch {
+      setEditSessionError("Erreur réseau. Veuillez réessayer.");
+    }
+  };
+
+  const deleteSession = async (sessionId: string) => {
+    if (!confirm("Supprimer cette séance définitivement ?")) return;
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
+      if (!response.ok) return;
+      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+      setSelectedEvent(null);
+    } catch {
+      // keep UI unchanged on error
     }
   };
 
@@ -569,9 +641,140 @@ export default function CalendrierPage() {
                       {selectedEvent.isAbsent ? "Annuler absence" : "Patient absent"}
                     </button>
                   </div>
+
+                  {/* Edit / Delete row */}
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      onClick={() => openEditModal(selectedEvent)}
+                      className="flex-1 btn btn-secondary text-sm"
+                    >
+                      <Edit2 size={14} />
+                      Modifier
+                    </button>
+                    <button
+                      onClick={() => void deleteSession(selectedEvent.id)}
+                      className="btn text-sm text-red-600 hover:bg-red-50 border border-[var(--color-border-default)]"
+                    >
+                      <Trash2 size={14} />
+                      Supprimer
+                    </button>
+                  </div>
                 </div>
               );
             })()}
+          </div>
+        </div>
+      )}
+
+      {/* Edit Session Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-6 fade-in">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-[var(--color-text-primary)]">
+                Modifier la séance
+              </h2>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="p-2 rounded-lg hover:bg-[var(--color-bg-tertiary)]"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={(e) => void handleUpdateSession(e)} className="space-y-4">
+              {editSessionError && (
+                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  {editSessionError}
+                </p>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                  Patient *
+                </label>
+                <select
+                  required
+                  value={editSession.patientId}
+                  onChange={(e) => setEditSession({ ...editSession, patientId: e.target.value })}
+                  className="w-full px-3 py-2.5 rounded-lg border border-[var(--color-border-default)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 bg-white"
+                >
+                  <option value="">Sélectionner un patient...</option>
+                  {patients.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.firstName} {p.lastName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                    Heure de début *
+                  </label>
+                  <input
+                    type="datetime-local"
+                    required
+                    value={editSession.startTime}
+                    onChange={(e) => setEditSession({ ...editSession, startTime: e.target.value })}
+                    className="w-full px-3 py-2.5 rounded-lg border border-[var(--color-border-default)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                    Heure de fin *
+                  </label>
+                  <input
+                    type="datetime-local"
+                    required
+                    value={editSession.endTime}
+                    onChange={(e) => setEditSession({ ...editSession, endTime: e.target.value })}
+                    className="w-full px-3 py-2.5 rounded-lg border border-[var(--color-border-default)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                  Salle
+                </label>
+                <input
+                  type="text"
+                  value={editSession.room}
+                  onChange={(e) => setEditSession({ ...editSession, room: e.target.value })}
+                  className="w-full px-3 py-2.5 rounded-lg border border-[var(--color-border-default)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
+                  placeholder="Ex: 1, 2, A, B..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                  Notes
+                </label>
+                <textarea
+                  value={editSession.notes}
+                  onChange={(e) => setEditSession({ ...editSession, notes: e.target.value })}
+                  rows={3}
+                  className="w-full px-3 py-2.5 rounded-lg border border-[var(--color-border-default)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 resize-none"
+                  placeholder="Notes de séance..."
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="flex-1 btn btn-secondary"
+                >
+                  Annuler
+                </button>
+                <button type="submit" className="flex-1 btn btn-primary">
+                  <Edit2 size={16} />
+                  Enregistrer
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

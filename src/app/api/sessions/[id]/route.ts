@@ -33,6 +33,7 @@ export async function PATCH(
     const updated = await prisma.session.update({
       where: { id },
       data: {
+        title: typeof body.title === "string" ? body.title : undefined,
         isCompleted:
           typeof body.isCompleted === "boolean" ? body.isCompleted : undefined,
         isAbsent:
@@ -41,12 +42,27 @@ export async function PATCH(
         endTime: body.endTime ? new Date(body.endTime) : undefined,
         room: typeof body.room === "string" ? (body.room || null) : undefined,
         notes: typeof body.notes === "string" ? body.notes : undefined,
+        patientId: typeof body.patientId === "string" && body.patientId ? body.patientId : undefined,
       },
     });
 
     return NextResponse.json(mapSession(updated));
   } catch (error) {
     console.error("Error updating session:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    await prisma.session.delete({ where: { id } });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting session:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
