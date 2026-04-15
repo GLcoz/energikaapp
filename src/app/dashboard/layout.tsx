@@ -17,6 +17,7 @@ import {
   ChevronDown,
   Settings,
   Stethoscope,
+  Contact,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -35,6 +36,7 @@ const adminLinks = [
   { href: "/dashboard/paiements", label: "Paiements", icon: Wallet },
   { href: "/dashboard/depenses", label: "Dépenses", icon: Receipt },
   { href: "/dashboard/relances", label: "Relances", icon: Bell },
+  { href: "/dashboard/repertoire", label: "Répertoire", icon: Contact },
   { href: "/dashboard/parametres", label: "Paramètres", icon: Settings },
 ];
 
@@ -42,6 +44,7 @@ const orthoLinks = [
   { href: "/dashboard", label: "Tableau de bord", icon: LayoutDashboard },
   { href: "/dashboard/patients", label: "Patients", icon: Users },
   { href: "/dashboard/calendrier", label: "Mon Calendrier", icon: Calendar },
+  { href: "/dashboard/repertoire", label: "Répertoire", icon: Contact },
 ];
 
 export default function DashboardLayout({
