@@ -109,3 +109,11 @@ export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
   PENDING: "En attente",
   PARTIAL: "Partiel",
 };
+
+export interface Contact {
+  id: string;
+  name: string;
+  phone: string;
+  role?: string;
+  notes?: string;
+}

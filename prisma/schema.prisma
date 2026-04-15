@@ -98,6 +98,18 @@ model Expense {
   @@map("expenses")
 }
 
+model Contact {
+  id        String   @id @default(uuid())
+  name      String
+  phone     String
+  role      String?
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("contacts")
+}
+
 enum Role {
   ADMIN
   ORTHO
