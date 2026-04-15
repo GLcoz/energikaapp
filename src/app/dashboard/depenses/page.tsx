@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Receipt,
   Plus,
@@ -11,7 +11,6 @@ import {
   Download,
 } from "lucide-react";
 import { formatCurrency, formatShortDate } from "@/lib/utils";
-import { demoExpenses } from "@/lib/demo-data";
 import type { Expense, ExpenseCategory } from "@/lib/types";
 
 const categoryLabels: Record<ExpenseCategory, string> = {
@@ -31,10 +30,12 @@ const categoryColors: Record<ExpenseCategory, string> = {
 };
 
 export default function DepensesPage() {
-  const [expenses, setExpenses] = useState<Expense[]>(demoExpenses);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState<ExpenseCategory | "ALL">("ALL");
+  const [addExpenseError, setAddExpenseError] = useState("");
   const [newExpense, setNewExpense] = useState({
     title: "",
     category: "AUTRE" as ExpenseCategory,
@@ -42,6 +43,24 @@ export default function DepensesPage() {
     date: new Date().toISOString().split("T")[0],
     description: "",
   });
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/expenses", { cache: "no-store" });
+      if (res.ok) {
+        setExpenses((await res.json()) as Expense[]);
+      }
+    } catch {
+      // keep empty on error
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
 
   const filteredExpenses = expenses
     .filter((e) => filterCategory === "ALL" || e.category === filterCategory)
@@ -60,26 +79,48 @@ export default function DepensesPage() {
     return acc;
   }, {} as Record<ExpenseCategory, number>);
 
-  const handleAddExpense = (e: React.FormEvent) => {
+  const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
-    const expense: Expense = {
-      id: `e${Date.now()}`,
-      ...newExpense,
-    };
-    setExpenses([...expenses, expense]);
-    setShowAddModal(false);
-    setNewExpense({
-      title: "",
-      category: "AUTRE",
-      amount: 0,
-      date: new Date().toISOString().split("T")[0],
-      description: "",
-    });
+    setAddExpenseError("");
+
+    try {
+      const response = await fetch("/api/expenses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newExpense),
+      });
+
+      if (!response.ok) {
+        const errorData = (await response.json().catch(() => null)) as { error?: string } | null;
+        setAddExpenseError(errorData?.error || "Impossible d'ajouter la dépense.");
+        return;
+      }
+
+      const created = (await response.json()) as Expense;
+      setExpenses([created, ...expenses]);
+      setShowAddModal(false);
+      setNewExpense({
+        title: "",
+        category: "AUTRE",
+        amount: 0,
+        date: new Date().toISOString().split("T")[0],
+        description: "",
+      });
+    } catch {
+      setAddExpenseError("Erreur réseau. Veuillez réessayer.");
+    }
   };
 
-  const handleDeleteExpense = (id: string) => {
-    if (confirm("Supprimer cette dépense ?")) {
+  const handleDeleteExpense = async (id: string) => {
+    if (!confirm("Supprimer cette dépense définitivement ?")) return;
+
+    try {
+      const response = await fetch(`/api/expenses/${id}`, { method: "DELETE" });
+      if (!response.ok) return;
+
       setExpenses(expenses.filter((e) => e.id !== id));
+    } catch {
+      // Keep UI unchanged on error
     }
   };
 
@@ -138,6 +179,21 @@ export default function DepensesPage() {
     doc.save(`depenses-${new Date().toISOString().slice(0, 10)}.pdf`);
   };
 
+  if (loading) {
+    return (
+      <div className="space-y-6 fade-in">
+        <div className="skeleton h-12 w-64 rounded-lg" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="p-4 rounded-xl border-2 skeleton h-24" />
+          ))}
+        </div>
+        <div className="card p-5 h-24 skeleton rounded-xl" />
+        <div className="card h-96 skeleton rounded-xl" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 fade-in">
       {/* Header */}
@@ -162,7 +218,10 @@ export default function DepensesPage() {
             Exporter PDF
           </button>
           <button
-            onClick={() => setShowAddModal(true)}
+            onClick={() => {
+              setAddExpenseError("");
+              setShowAddModal(true);
+            }}
             className="btn btn-primary"
           >
             <Plus size={18} />
@@ -264,7 +323,7 @@ export default function DepensesPage() {
                   </td>
                   <td>
                     <button
-                      onClick={() => handleDeleteExpense(expense.id)}
+                      onClick={() => void handleDeleteExpense(expense.id)}
                       className="p-2 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
                     >
                       <Trash2 size={16} />
@@ -272,6 +331,13 @@ export default function DepensesPage() {
                   </td>
                 </tr>
               ))}
+              {filteredExpenses.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="text-center py-8 text-[var(--color-text-muted)] text-sm">
+                    Aucune dépense trouvée.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -293,7 +359,13 @@ export default function DepensesPage() {
               </button>
             </div>
 
-            <form onSubmit={handleAddExpense} className="space-y-4">
+            <form onSubmit={(e) => void handleAddExpense(e)} className="space-y-4">
+              {addExpenseError && (
+                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  {addExpenseError}
+                </p>
+              )}
+              
               <div>
                 <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
                   Titre *
