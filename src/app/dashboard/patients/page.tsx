@@ -30,6 +30,8 @@ export default function PatientsPage() {
   const [openSessionId, setOpenSessionId] = useState<string | null>(null);
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
   const [editCoordinates, setEditCoordinates] = useState({
+    firstName: "",
+    lastName: "",
     parentName: "",
     parentPhone: "",
   });
@@ -144,6 +146,8 @@ export default function PatientsPage() {
   const openEditCoordinatesModal = (patient: Patient) => {
     setEditingPatient(patient);
     setEditCoordinates({
+      firstName: patient.firstName,
+      lastName: patient.lastName,
       parentName: patient.parentName ?? "",
       parentPhone: patient.parentPhone,
     });
@@ -497,7 +501,7 @@ export default function PatientsPage() {
           <div className="bg-white rounded-2xl max-w-md w-full p-6 fade-in">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-[var(--color-text-primary)]">
-                Modifier coordonnées
+                Modifier le patient
               </h2>
               <button
                 onClick={() => {
@@ -511,6 +515,43 @@ export default function PatientsPage() {
             </div>
 
             <form onSubmit={handleUpdateCoordinates} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                    Prénom
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editCoordinates.firstName}
+                    onChange={(e) =>
+                      setEditCoordinates((prev) => ({
+                        ...prev,
+                        firstName: e.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2.5 rounded-lg border border-[var(--color-border-default)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                    Nom
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editCoordinates.lastName}
+                    onChange={(e) =>
+                      setEditCoordinates((prev) => ({
+                        ...prev,
+                        lastName: e.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2.5 rounded-lg border border-[var(--color-border-default)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
                   Nom du parent

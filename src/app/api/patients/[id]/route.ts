@@ -38,6 +38,8 @@ export async function PATCH(
     const updated = await prisma.patient.update({
       where: { id },
       data: {
+        firstName: body.firstName,
+        lastName: body.lastName,
         parentName: body.parentName ?? null,
         parentPhone: body.parentPhone,
       },
