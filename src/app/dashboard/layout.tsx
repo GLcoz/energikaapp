@@ -18,6 +18,8 @@ import {
   Settings,
   Stethoscope,
   Contact,
+  UserMinus,
+  Handshake,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -32,9 +34,11 @@ type User = {
 const adminLinks = [
   { href: "/dashboard", label: "Tableau de bord", icon: LayoutDashboard },
   { href: "/dashboard/patients", label: "Patients", icon: Users },
+  { href: "/dashboard/patients-quittes", label: "Patients quittés", icon: UserMinus },
   { href: "/dashboard/calendrier", label: "Calendrier", icon: Calendar },
   { href: "/dashboard/paiements", label: "Paiements", icon: Wallet },
   { href: "/dashboard/depenses", label: "Dépenses", icon: Receipt },
+  { href: "/dashboard/sous-traitance", label: "Sous-traitance", icon: Handshake },
   { href: "/dashboard/relances", label: "Relances", icon: Bell },
   { href: "/dashboard/repertoire", label: "Répertoire", icon: Contact },
   { href: "/dashboard/parametres", label: "Paramètres", icon: Settings },
@@ -43,6 +47,7 @@ const adminLinks = [
 const orthoLinks = [
   { href: "/dashboard", label: "Tableau de bord", icon: LayoutDashboard },
   { href: "/dashboard/patients", label: "Patients", icon: Users },
+  { href: "/dashboard/patients-quittes", label: "Patients quittés", icon: UserMinus },
   { href: "/dashboard/calendrier", label: "Mon Calendrier", icon: Calendar },
   { href: "/dashboard/repertoire", label: "Répertoire", icon: Contact },
 ];

@@ -75,6 +75,11 @@ model Session {
   notes       String?
   isCompleted Boolean  @default(false) @map("is_completed")
   isAbsent    Boolean  @default(false) @map("is_absent")
+  isSubcontracted    Boolean  @default(false) @map("is_subcontracted")
+  subcontractorName  String?  @map("subcontractor_name")
+  subcontractorPhone String?  @map("subcontractor_phone")
+  subcontractorFee   Float?   @map("subcontractor_fee")
+  subcontractorNotes String?  @map("subcontractor_notes")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
   patientId   String   @map("patient_id")

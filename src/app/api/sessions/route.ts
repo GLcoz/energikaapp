@@ -10,6 +10,11 @@ function mapSession(session: {
   notes: string | null;
   isCompleted: boolean;
   isAbsent: boolean;
+  isSubcontracted: boolean;
+  subcontractorName: string | null;
+  subcontractorPhone: string | null;
+  subcontractorFee: number | null;
+  subcontractorNotes: string | null;
   patientId: string;
   therapistId: string;
 }) {
@@ -19,6 +24,10 @@ function mapSession(session: {
     endTime: session.endTime.toISOString(),
     room: session.room ?? undefined,
     notes: session.notes ?? undefined,
+    subcontractorName: session.subcontractorName ?? undefined,
+    subcontractorPhone: session.subcontractorPhone ?? undefined,
+    subcontractorFee: session.subcontractorFee ?? undefined,
+    subcontractorNotes: session.subcontractorNotes ?? undefined,
   };
 }
 
@@ -127,6 +136,11 @@ export async function POST(request: Request) {
         room: body.room || null,
         notes: body.notes || null,
         isCompleted: false,
+        isSubcontracted: body.isSubcontracted === true,
+        subcontractorName: body.isSubcontracted ? (body.subcontractorName || null) : null,
+        subcontractorPhone: body.isSubcontracted ? (body.subcontractorPhone || null) : null,
+        subcontractorFee: body.isSubcontracted && typeof body.subcontractorFee === "number" ? body.subcontractorFee : null,
+        subcontractorNotes: body.isSubcontracted ? (body.subcontractorNotes || null) : null,
         patientId: body.patientId,
         therapistId,
       },

@@ -1,6 +1,46 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+const EXIT_META_PREFIX = "__EXIT_META__:";
+
+function parseExitMeta(notes: string | null) {
+  if (!notes) return { exitDate: undefined, exitReason: undefined };
+
+  const markerLine = notes
+    .split("\n")
+    .map((line) => line.trim())
+    .find((line) => line.startsWith(EXIT_META_PREFIX));
+
+  if (!markerLine) return { exitDate: undefined, exitReason: undefined };
+
+  const payload = markerLine.slice(EXIT_META_PREFIX.length);
+  const separatorIndex = payload.indexOf("|");
+
+  if (separatorIndex === -1) {
+    return { exitDate: undefined, exitReason: undefined };
+  }
+
+  const exitDate = payload.slice(0, separatorIndex).trim();
+  const exitReason = payload.slice(separatorIndex + 1).trim();
+
+  return {
+    exitDate: exitDate || undefined,
+    exitReason: exitReason || undefined,
+  };
+}
+
+function removeExitMeta(notes: string | null) {
+  if (!notes) return undefined;
+
+  const cleaned = notes
+    .split("\n")
+    .filter((line) => !line.trim().startsWith(EXIT_META_PREFIX))
+    .join("\n")
+    .trim();
+
+  return cleaned || undefined;
+}
+
 function mapPatient(patient: {
   id: string;
   firstName: string;
@@ -16,14 +56,18 @@ function mapPatient(patient: {
   therapistId: string;
   createdAt: Date;
 }) {
+  const { exitDate, exitReason } = parseExitMeta(patient.notes);
+
   return {
     ...patient,
     dateOfBirth: patient.dateOfBirth?.toISOString(),
     parentName: patient.parentName ?? undefined,
     parentEmail: patient.parentEmail ?? undefined,
-    notes: patient.notes ?? undefined,
+    notes: removeExitMeta(patient.notes),
     startDate: patient.startDate.toISOString(),
     createdAt: patient.createdAt.toISOString(),
+    exitDate,
+    exitReason,
   };
 }
 

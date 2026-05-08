@@ -10,6 +10,11 @@ function mapSession(session: {
   notes: string | null;
   isCompleted: boolean;
   isAbsent: boolean;
+  isSubcontracted: boolean;
+  subcontractorName: string | null;
+  subcontractorPhone: string | null;
+  subcontractorFee: number | null;
+  subcontractorNotes: string | null;
   patientId: string;
   therapistId: string;
 }) {
@@ -19,6 +24,10 @@ function mapSession(session: {
     endTime: session.endTime.toISOString(),
     room: session.room ?? undefined,
     notes: session.notes ?? undefined,
+    subcontractorName: session.subcontractorName ?? undefined,
+    subcontractorPhone: session.subcontractorPhone ?? undefined,
+    subcontractorFee: session.subcontractorFee ?? undefined,
+    subcontractorNotes: session.subcontractorNotes ?? undefined,
   };
 }
 
@@ -29,6 +38,9 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
+
+    // If explicitly toggling off subcontracting, clear all subcontractor fields
+    const isTogglingOff = body.isSubcontracted === false;
 
     const updated = await prisma.session.update({
       where: { id },
@@ -43,6 +55,29 @@ export async function PATCH(
         room: typeof body.room === "string" ? (body.room || null) : undefined,
         notes: typeof body.notes === "string" ? body.notes : undefined,
         patientId: typeof body.patientId === "string" && body.patientId ? body.patientId : undefined,
+        // Subcontracting fields
+        isSubcontracted:
+          typeof body.isSubcontracted === "boolean" ? body.isSubcontracted : undefined,
+        subcontractorName: isTogglingOff
+          ? null
+          : typeof body.subcontractorName === "string"
+          ? (body.subcontractorName || null)
+          : undefined,
+        subcontractorPhone: isTogglingOff
+          ? null
+          : typeof body.subcontractorPhone === "string"
+          ? (body.subcontractorPhone || null)
+          : undefined,
+        subcontractorFee: isTogglingOff
+          ? null
+          : typeof body.subcontractorFee === "number"
+          ? body.subcontractorFee
+          : undefined,
+        subcontractorNotes: isTogglingOff
+          ? null
+          : typeof body.subcontractorNotes === "string"
+          ? (body.subcontractorNotes || null)
+          : undefined,
       },
     });
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { Calendar as CalendarIcon, Plus, X, ChevronDown, ChevronUp, UserX, Edit2, Trash2 } from "lucide-react";
+import { Calendar as CalendarIcon, Plus, X, ChevronDown, ChevronUp, UserX, Edit2, Trash2, Handshake } from "lucide-react";
 import type { Session, Patient, User } from "@/lib/types";
 
 // Dynamic import FullCalendar to avoid SSR issues
@@ -35,6 +35,10 @@ export default function CalendrierPage() {
     endTime: "",
     room: "",
     notes: "",
+    isSubcontracted: false,
+    subcontractorName: "",
+    subcontractorPhone: "",
+    subcontractorNotes: "",
   });
   const [showEditModal, setShowEditModal] = useState(false);
   const [editSession, setEditSession] = useState({
@@ -44,6 +48,10 @@ export default function CalendrierPage() {
     endTime: "",
     room: "",
     notes: "",
+    isSubcontracted: false,
+    subcontractorName: "",
+    subcontractorPhone: "",
+    subcontractorNotes: "",
   });
   const [editSessionError, setEditSessionError] = useState("");
 
@@ -78,14 +86,18 @@ export default function CalendrierPage() {
   const events = sessions.map((session) => {
     const patient = patients.find((p) => p.id === session.patientId);
 
-    // Priority: absent (orange) > completed (green) > planned (blue)
+    // Priority: absent (orange) > subcontracted (purple) > completed (green) > planned (blue)
     const bgColor = session.isAbsent
       ? "#f97316"
+      : session.isSubcontracted
+      ? "#8b5cf6"
       : session.isCompleted
       ? "#10b981"
       : "#1e6bb8";
     const borderColor = session.isAbsent
       ? "#ea580c"
+      : session.isSubcontracted
+      ? "#7c3aed"
       : session.isCompleted
       ? "#059669"
       : "#1e40af";
@@ -97,6 +109,8 @@ export default function CalendrierPage() {
       id: session.id,
       title: session.isAbsent
         ? `🚫 ${nameLabel}${roomLabel}`
+        : session.isSubcontracted
+        ? `🤝 ${nameLabel}${roomLabel}`
         : `${nameLabel}${roomLabel}`,
       start: session.startTime,
       end: session.endTime,
@@ -133,6 +147,10 @@ export default function CalendrierPage() {
       endTime: localEnd,
       room: "",
       notes: "",
+      isSubcontracted: false,
+      subcontractorName: "",
+      subcontractorPhone: "",
+      subcontractorNotes: "",
     });
     setShowAddModal(true);
   };
@@ -155,6 +173,17 @@ export default function CalendrierPage() {
       return;
     }
 
+    // Calculate subcontractor fee: 50% of per-session cost
+    // Per-session cost = monthlyFee / total sessions per month (derived from all sessions this month for this patient)
+    const sessionsThisMonth = sessions.filter((s) => {
+      const d = new Date(s.startTime);
+      const sessionMonth = d.getMonth() + 1;
+      const sessionYear = d.getFullYear();
+      return s.patientId === patient.id && sessionMonth === currentMonth && sessionYear === new Date().getFullYear();
+    }).length + 1; // +1 for the one being created
+    const perSessionCost = patient.monthlyFee / Math.max(sessionsThisMonth, 1);
+    const subFee = Math.round(perSessionCost / 2 * 100) / 100;
+
     try {
       const response = await fetch("/api/sessions", {
         method: "POST",
@@ -171,6 +200,11 @@ export default function CalendrierPage() {
           therapistFirstName: user?.firstName,
           therapistLastName: user?.lastName,
           therapistRole: user?.role,
+          isSubcontracted: newSession.isSubcontracted,
+          subcontractorName: newSession.subcontractorName || null,
+          subcontractorPhone: newSession.subcontractorPhone || null,
+          subcontractorFee: newSession.isSubcontracted ? subFee : null,
+          subcontractorNotes: newSession.subcontractorNotes || null,
         }),
       });
 
@@ -246,6 +280,10 @@ export default function CalendrierPage() {
       endTime: toLocal(session.endTime),
       room: session.room ?? "",
       notes: session.notes ?? "",
+      isSubcontracted: session.isSubcontracted ?? false,
+      subcontractorName: session.subcontractorName ?? "",
+      subcontractorPhone: session.subcontractorPhone ?? "",
+      subcontractorNotes: session.subcontractorNotes ?? "",
     });
     setEditSessionError("");
     setShowEditModal(true);
@@ -261,6 +299,14 @@ export default function CalendrierPage() {
     }
     try {
       const patient = patients.find((p) => p.id === editSession.patientId);
+      // Recalculate fee for subcontracted sessions
+      const sessionsThisMonthForPatient = sessions.filter((s) => {
+        const d = new Date(s.startTime);
+        return s.patientId === editSession.patientId && d.getMonth() + 1 === currentMonth && d.getFullYear() === new Date().getFullYear();
+      }).length || 1;
+      const editPerSessionCost = (patient?.monthlyFee ?? 0) / sessionsThisMonthForPatient;
+      const editSubFee = Math.round(editPerSessionCost / 2 * 100) / 100;
+
       const response = await fetch(`/api/sessions/${editSession.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -271,6 +317,11 @@ export default function CalendrierPage() {
           room: editSession.room || null,
           notes: editSession.notes,
           patientId: editSession.patientId,
+          isSubcontracted: editSession.isSubcontracted,
+          subcontractorName: editSession.subcontractorName || null,
+          subcontractorPhone: editSession.subcontractorPhone || null,
+          subcontractorFee: editSession.isSubcontracted ? editSubFee : null,
+          subcontractorNotes: editSession.subcontractorNotes || null,
         }),
       });
       if (!response.ok) {
@@ -355,6 +406,10 @@ export default function CalendrierPage() {
               endTime: `${today}T09:45`,
               room: "",
               notes: "",
+              isSubcontracted: false,
+              subcontractorName: "",
+              subcontractorPhone: "",
+              subcontractorNotes: "",
             });
             setShowAddModal(true);
           }}
@@ -378,6 +433,10 @@ export default function CalendrierPage() {
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-orange-500" />
           <span className="text-[var(--color-text-muted)]">Patient absent</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-violet-500" />
+          <span className="text-[var(--color-text-muted)]">Sous-traitée</span>
         </div>
       </div>
 
@@ -455,6 +514,8 @@ export default function CalendrierPage() {
                 className={`rounded-xl border bg-white ${
                   session.isAbsent
                     ? "border-orange-200"
+                    : session.isSubcontracted
+                    ? "border-violet-200"
                     : "border-[var(--color-border-light)]"
                 }`}
               >
@@ -489,6 +550,11 @@ export default function CalendrierPage() {
                     {session.isAbsent && (
                       <span className="badge" style={{ background: "#fed7aa", color: "#c2410c" }}>
                         Absent
+                      </span>
+                    )}
+                    {session.isSubcontracted && (
+                      <span className="badge" style={{ background: "#ede9fe", color: "#6d28d9" }}>
+                        🤝 Sous-traitée
                       </span>
                     )}
                     {!session.isAbsent && (
@@ -601,10 +667,48 @@ export default function CalendrierPage() {
                     </div>
                   )}
 
+                  {selectedEvent.isSubcontracted && (
+                    <div className="p-4 rounded-lg bg-violet-50 border border-violet-200 space-y-2">
+                      <p className="text-xs font-semibold text-violet-700 flex items-center gap-1.5">
+                        <Handshake size={14} /> Séance sous-traitée
+                      </p>
+                      {selectedEvent.subcontractorName && (
+                        <p className="text-sm text-violet-900">
+                          <span className="font-medium">Orthophoniste :</span> {selectedEvent.subcontractorName}
+                        </p>
+                      )}
+                      {selectedEvent.subcontractorPhone && (
+                        <p className="text-sm text-violet-900">
+                          <span className="font-medium">Tél :</span> {selectedEvent.subcontractorPhone}
+                        </p>
+                      )}
+                      {selectedEvent.subcontractorFee != null && (
+                        <div className="grid grid-cols-2 gap-2 mt-1">
+                          <div className="p-2 rounded bg-violet-100/60 text-center">
+                            <p className="text-[10px] text-violet-600">Ortho</p>
+                            <p className="text-sm font-bold text-violet-800">{selectedEvent.subcontractorFee} DH</p>
+                          </div>
+                          <div className="p-2 rounded bg-green-100/60 text-center">
+                            <p className="text-[10px] text-green-600">Centre</p>
+                            <p className="text-sm font-bold text-green-800">{selectedEvent.subcontractorFee} DH</p>
+                          </div>
+                        </div>
+                      )}
+                      {selectedEvent.subcontractorNotes && (
+                        <p className="text-xs text-violet-600 italic mt-1">{selectedEvent.subcontractorNotes}</p>
+                      )}
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-2">
                     {selectedEvent.isAbsent && (
                       <span className="badge" style={{ background: "#fed7aa", color: "#c2410c" }}>
                         Absent
+                      </span>
+                    )}
+                    {selectedEvent.isSubcontracted && (
+                      <span className="badge" style={{ background: "#ede9fe", color: "#6d28d9" }}>
+                        🤝 Sous-traitée
                       </span>
                     )}
                     {!selectedEvent.isAbsent && (
@@ -748,6 +852,80 @@ export default function CalendrierPage() {
                 />
               </div>
 
+              {/* Subcontracting Toggle - Admin only */}
+              {user?.role === "ADMIN" && (
+                <>
+                  <div
+                    className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
+                      editSession.isSubcontracted
+                        ? "bg-violet-50 border-violet-300"
+                        : "bg-[var(--color-bg-tertiary)] border-[var(--color-border-default)]"
+                    }`}
+                    onClick={() =>
+                      setEditSession({ ...editSession, isSubcontracted: !editSession.isSubcontracted })
+                    }
+                  >
+                    <div className="flex items-center gap-2">
+                      <Handshake size={16} className={editSession.isSubcontracted ? "text-violet-600" : "text-[var(--color-text-muted)]"} />
+                      <span className={`text-sm font-medium ${editSession.isSubcontracted ? "text-violet-700" : "text-[var(--color-text-secondary)]"}`}>
+                        Séance sous-traitée
+                      </span>
+                    </div>
+                    <div className={`w-10 h-5 rounded-full relative transition-colors ${editSession.isSubcontracted ? "bg-violet-500" : "bg-gray-300"}`}>
+                      <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${editSession.isSubcontracted ? "translate-x-5" : "translate-x-0.5"}`} />
+                    </div>
+                  </div>
+
+                  {editSession.isSubcontracted && (
+                    <div className="space-y-3 p-4 rounded-lg bg-violet-50/50 border border-violet-200">
+                      <div>
+                        <label className="block text-sm font-medium text-violet-700 mb-1">
+                          Nom de l&apos;orthophoniste *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={editSession.subcontractorName}
+                          onChange={(e) =>
+                            setEditSession({ ...editSession, subcontractorName: e.target.value })
+                          }
+                          className="w-full px-3 py-2.5 rounded-lg border border-violet-200 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400/30 bg-white"
+                          placeholder="Ex: Dr. Amina Bouzid"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-violet-700 mb-1">
+                          Téléphone
+                        </label>
+                        <input
+                          type="text"
+                          value={editSession.subcontractorPhone}
+                          onChange={(e) =>
+                            setEditSession({ ...editSession, subcontractorPhone: e.target.value })
+                          }
+                          className="w-full px-3 py-2.5 rounded-lg border border-violet-200 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400/30 bg-white"
+                          placeholder="06 XX XX XX XX"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-violet-700 mb-1">
+                          Notes sous-traitance
+                        </label>
+                        <textarea
+                          value={editSession.subcontractorNotes}
+                          onChange={(e) =>
+                            setEditSession({ ...editSession, subcontractorNotes: e.target.value })
+                          }
+                          rows={2}
+                          className="w-full px-3 py-2.5 rounded-lg border border-violet-200 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400/30 resize-none bg-white"
+                          placeholder="Notes spécifiques à la sous-traitance..."
+                        />
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
                   Notes
@@ -868,6 +1046,111 @@ export default function CalendrierPage() {
                   placeholder="Ex: 1, 2, A, B..."
                 />
               </div>
+
+              {/* Subcontracting Toggle - Admin only */}
+              {user?.role === "ADMIN" && (
+                <>
+                  <div
+                    className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
+                      newSession.isSubcontracted
+                        ? "bg-violet-50 border-violet-300"
+                        : "bg-[var(--color-bg-tertiary)] border-[var(--color-border-default)]"
+                    }`}
+                    onClick={() =>
+                      setNewSession({ ...newSession, isSubcontracted: !newSession.isSubcontracted })
+                    }
+                  >
+                    <div className="flex items-center gap-2">
+                      <Handshake size={16} className={newSession.isSubcontracted ? "text-violet-600" : "text-[var(--color-text-muted)]"} />
+                      <span className={`text-sm font-medium ${newSession.isSubcontracted ? "text-violet-700" : "text-[var(--color-text-secondary)]"}`}>
+                        Séance sous-traitée
+                      </span>
+                    </div>
+                    <div className={`w-10 h-5 rounded-full relative transition-colors ${newSession.isSubcontracted ? "bg-violet-500" : "bg-gray-300"}`}>
+                      <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${newSession.isSubcontracted ? "translate-x-5" : "translate-x-0.5"}`} />
+                    </div>
+                  </div>
+
+                  {newSession.isSubcontracted && (
+                    <div className="space-y-3 p-4 rounded-lg bg-violet-50/50 border border-violet-200">
+                      <div>
+                        <label className="block text-sm font-medium text-violet-700 mb-1">
+                          Nom de l&apos;orthophoniste *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={newSession.subcontractorName}
+                          onChange={(e) =>
+                            setNewSession({ ...newSession, subcontractorName: e.target.value })
+                          }
+                          className="w-full px-3 py-2.5 rounded-lg border border-violet-200 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400/30 bg-white"
+                          placeholder="Ex: Dr. Amina Bouzid"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-violet-700 mb-1">
+                          Téléphone
+                        </label>
+                        <input
+                          type="text"
+                          value={newSession.subcontractorPhone}
+                          onChange={(e) =>
+                            setNewSession({ ...newSession, subcontractorPhone: e.target.value })
+                          }
+                          className="w-full px-3 py-2.5 rounded-lg border border-violet-200 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400/30 bg-white"
+                          placeholder="06 XX XX XX XX"
+                        />
+                      </div>
+                      {/* Auto-calculated fee display */}
+                      {newSession.patientId && (() => {
+                        const selectedPatient = patients.find(p => p.id === newSession.patientId);
+                        if (!selectedPatient) return null;
+                        const monthSessions = sessions.filter(s => {
+                          const d = new Date(s.startTime);
+                          return s.patientId === selectedPatient.id && d.getMonth() + 1 === currentMonth && d.getFullYear() === new Date().getFullYear();
+                        }).length + 1;
+                        const perSession = selectedPatient.monthlyFee / Math.max(monthSessions, 1);
+                        const halfFee = Math.round(perSession / 2 * 100) / 100;
+                        return (
+                          <div className="p-3 rounded-lg bg-white border border-violet-200">
+                            <p className="text-xs text-violet-600 font-medium mb-2">💰 Répartition automatique (50/50)</p>
+                            <div className="grid grid-cols-3 gap-2 text-center">
+                              <div>
+                                <p className="text-[10px] text-gray-500">Mensualité</p>
+                                <p className="text-sm font-bold text-gray-800">{selectedPatient.monthlyFee} DH</p>
+                              </div>
+                              <div>
+                                <p className="text-[10px] text-violet-500">Ortho</p>
+                                <p className="text-sm font-bold text-violet-700">{halfFee} DH</p>
+                              </div>
+                              <div>
+                                <p className="text-[10px] text-green-500">Centre</p>
+                                <p className="text-sm font-bold text-green-700">{halfFee} DH</p>
+                              </div>
+                            </div>
+                            <p className="text-[10px] text-gray-400 mt-1 text-center">{monthSessions} séances ce mois → {Math.round(perSession * 100) / 100} DH/séance</p>
+                          </div>
+                        );
+                      })()}
+                      <div>
+                        <label className="block text-sm font-medium text-violet-700 mb-1">
+                          Notes sous-traitance
+                        </label>
+                        <textarea
+                          value={newSession.subcontractorNotes}
+                          onChange={(e) =>
+                            setNewSession({ ...newSession, subcontractorNotes: e.target.value })
+                          }
+                          rows={2}
+                          className="w-full px-3 py-2.5 rounded-lg border border-violet-200 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400/30 resize-none bg-white"
+                          placeholder="Notes spécifiques à la sous-traitance..."
+                        />
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">

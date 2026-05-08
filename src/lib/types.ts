@@ -33,6 +33,8 @@ export interface Patient {
   startDate: string;
   notes?: string;
   isActive: boolean;
+  exitDate?: string;
+  exitReason?: string;
   therapistId: string;
   therapist?: User;
   createdAt: string;
@@ -60,6 +62,11 @@ export interface Session {
   notes?: string;
   isCompleted: boolean;
   isAbsent: boolean;
+  isSubcontracted: boolean;
+  subcontractorName?: string;
+  subcontractorPhone?: string;
+  subcontractorFee?: number;
+  subcontractorNotes?: string;
   patientId: string;
   patient?: Patient;
   therapistId: string;

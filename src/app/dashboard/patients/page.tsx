@@ -13,6 +13,7 @@ import {
   X,
   ChevronDown,
   ChevronUp,
+  UserMinus,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Patient, Session, MonthlyBilling, User } from "@/lib/types";
@@ -27,13 +28,19 @@ export default function PatientsPage() {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showExitModal, setShowExitModal] = useState(false);
   const [openSessionId, setOpenSessionId] = useState<string | null>(null);
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
+  const [exitingPatient, setExitingPatient] = useState<Patient | null>(null);
   const [editCoordinates, setEditCoordinates] = useState({
     firstName: "",
     lastName: "",
     parentName: "",
     parentPhone: "",
+  });
+  const [exitForm, setExitForm] = useState({
+    exitDate: new Date().toISOString().split("T")[0],
+    exitReason: "",
   });
   const [newPatient, setNewPatient] = useState({
     firstName: "",
@@ -81,10 +88,11 @@ export default function PatientsPage() {
 
   const filteredPatients = patients.filter(
     (p) =>
-      `${p.firstName} ${p.lastName}`
+      p.isActive &&
+      (`${p.firstName} ${p.lastName}`
         .toLowerCase()
         .includes(searchTerm.toLowerCase()) ||
-      p.parentPhone.includes(searchTerm)
+        p.parentPhone.includes(searchTerm))
   );
 
   const handleAddPatient = async (e: React.FormEvent) => {
@@ -179,6 +187,50 @@ export default function PatientsPage() {
 
       setShowEditModal(false);
       setEditingPatient(null);
+    } catch {
+      // keep UI unchanged on network/server error
+    }
+  };
+
+  const openExitPatientModal = (patient: Patient) => {
+    setExitingPatient(patient);
+    setExitForm({
+      exitDate: new Date().toISOString().split("T")[0],
+      exitReason: "",
+    });
+    setShowExitModal(true);
+  };
+
+  const handleMarkAsExited = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!exitingPatient) return;
+
+    try {
+      const response = await fetch(`/api/patients/${exitingPatient.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          isActive: false,
+          exitDate: exitForm.exitDate,
+          exitReason: exitForm.exitReason,
+        }),
+      });
+
+      if (!response.ok) return;
+
+      const updated = (await response.json()) as Patient;
+
+      setPatients((prev) =>
+        prev.map((patient) => (patient.id === exitingPatient.id ? updated : patient))
+      );
+
+      if (selectedPatient?.id === exitingPatient.id) {
+        setSelectedPatient(updated);
+      }
+
+      setShowExitModal(false);
+      setExitingPatient(null);
     } catch {
       // keep UI unchanged on network/server error
     }
@@ -336,6 +388,13 @@ export default function PatientsPage() {
                   className="btn btn-secondary text-xs py-2 px-3"
                 >
                   <Edit2 size={14} />
+                </button>
+                <button
+                  onClick={() => openExitPatientModal(patient)}
+                  className="btn text-xs py-2 px-3 text-amber-600 hover:bg-amber-50 border border-[var(--color-border-default)]"
+                  title="Marquer comme patient quitté"
+                >
+                  <UserMinus size={14} />
                 </button>
                 <button
                   onClick={() => handleDeletePatient(patient.id)}
@@ -600,6 +659,80 @@ export default function PatientsPage() {
                 </button>
                 <button type="submit" className="flex-1 btn btn-primary">
                   Enregistrer
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showExitModal && exitingPatient && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 fade-in">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-[var(--color-text-primary)]">
+                Patient quitté le centre
+              </h2>
+              <button
+                onClick={() => {
+                  setShowExitModal(false);
+                  setExitingPatient(null);
+                }}
+                className="p-2 rounded-lg hover:bg-[var(--color-bg-tertiary)]"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <p className="text-sm text-[var(--color-text-secondary)] mb-4">
+              {exitingPatient.firstName} {exitingPatient.lastName}
+            </p>
+
+            <form onSubmit={handleMarkAsExited} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                  Date de sortie *
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={exitForm.exitDate}
+                  onChange={(e) =>
+                    setExitForm((prev) => ({ ...prev, exitDate: e.target.value }))
+                  }
+                  className="w-full px-3 py-2.5 rounded-lg border border-[var(--color-border-default)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                  Cause de sortie *
+                </label>
+                <textarea
+                  required
+                  rows={3}
+                  value={exitForm.exitReason}
+                  onChange={(e) =>
+                    setExitForm((prev) => ({ ...prev, exitReason: e.target.value }))
+                  }
+                  className="w-full px-3 py-2.5 rounded-lg border border-[var(--color-border-default)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 resize-none"
+                  placeholder="Ex: Fin de prise en charge, déménagement, etc."
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowExitModal(false);
+                    setExitingPatient(null);
+                  }}
+                  className="flex-1 btn btn-secondary"
+                >
+                  Annuler
+                </button>
+                <button type="submit" className="flex-1 btn btn-primary">
+                  Valider la sortie
                 </button>
               </div>
             </form>
