@@ -27,7 +27,13 @@ export default function LoginPage() {
       });
 
       if (error) {
-        setError("Email ou mot de passe incorrect (" + error.message + ")");
+        if (error.message.includes("Failed to fetch") || error.message.toLowerCase().includes("fetch")) {
+          setError("Impossible de joindre Supabase (Failed to fetch). Vérifiez que votre projet Supabase n'est pas en pause (Paused) ou que les clés dans .env sont correctes.");
+        } else if (error.message.toLowerCase().includes("invalid login credentials")) {
+          setError("Email ou mot de passe incorrect.");
+        } else {
+          setError(`Erreur de connexion : ${error.message}`);
+        }
       } else if (data.user) {
         const authUser = data.user;
         const emailValue = authUser.email ?? email;
