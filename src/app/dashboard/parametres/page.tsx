@@ -232,8 +232,8 @@ export default function ParametresPage() {
 
       {/* Add User Modal */}
       {showAddUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-md">
+          <div className="glass-modal rounded-2xl max-w-md w-full p-6 fade-in shadow-2xl">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-[var(--color-text-primary)]">
                 Nouveau Compte

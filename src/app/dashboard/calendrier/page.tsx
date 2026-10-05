@@ -441,7 +441,7 @@ export default function CalendrierPage() {
       </div>
 
       {/* Calendar */}
-      <div className="card p-4 lg:p-6">
+      <div className="card p-5 lg:p-7 shadow-sm">
         <FullCalendar
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
           initialView="dayGridMonth"
@@ -458,8 +458,8 @@ export default function CalendrierPage() {
           eventResize={handleSessionMoveOrResize}
           editable={true}
           selectable={true}
-          dayMaxEvents={3}
-          height="800px"
+          dayMaxEvents={5}
+          height="960px"
           slotEventOverlap={true}
           eventOverlap={true}
           buttonText={{
@@ -602,8 +602,8 @@ export default function CalendrierPage() {
 
       {/* Event Detail Modal */}
       {selectedEvent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-md fade-in">
+          <div className="glass-modal rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl fade-in">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-[var(--color-text-primary)]">
                 Détail de la séance
@@ -772,8 +772,8 @@ export default function CalendrierPage() {
 
       {/* Edit Session Modal */}
       {showEditModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-6 fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-md fade-in">
+          <div className="glass-modal rounded-3xl max-w-md w-full max-h-[90vh] overflow-y-auto p-6 sm:p-7 shadow-2xl fade-in">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-[var(--color-text-primary)]">
                 Modifier la séance
@@ -959,8 +959,8 @@ export default function CalendrierPage() {
 
       {/* Add Session Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-md fade-in">
+          <div className="glass-modal rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl fade-in">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-[var(--color-text-primary)]">
                 Nouvelle Séance

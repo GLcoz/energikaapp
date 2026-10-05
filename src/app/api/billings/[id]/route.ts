@@ -32,7 +32,12 @@ export async function PATCH(
       data: {
         status: body.status ?? undefined,
         amountPaid: typeof body.amountPaid === "number" ? body.amountPaid : undefined,
-        paidAt: body.paidAt ? new Date(body.paidAt) : undefined,
+        paidAt:
+          body.paidAt === null
+            ? null
+            : body.paidAt
+            ? new Date(body.paidAt)
+            : undefined,
         notes: typeof body.notes === "string" ? body.notes : undefined,
       },
     });

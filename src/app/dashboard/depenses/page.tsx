@@ -345,8 +345,8 @@ export default function DepensesPage() {
 
       {/* Add Expense Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-md fade-in">
+          <div className="glass-modal rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl fade-in">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-[var(--color-text-primary)]">
                 Nouvelle Dépense

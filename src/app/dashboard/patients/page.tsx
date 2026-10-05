@@ -14,6 +14,8 @@ import {
   ChevronDown,
   ChevronUp,
   UserMinus,
+  Clock,
+  CreditCard,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Patient, Session, MonthlyBilling, User } from "@/lib/types";
@@ -367,6 +369,26 @@ export default function PatientsPage() {
                     <span>Forfait: {formatCurrency(patient.monthlyFee)}/mois</span>
                   </div>
                 )}
+                {!isOrtho && (
+                  <div className="pt-1">
+                    {billing?.status === "PAID" && billing?.paidAt ? (
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+                        <Calendar size={12} className="text-green-600" />
+                        Payé le {new Date(billing.paidAt).toLocaleDateString("fr-FR")}
+                      </span>
+                    ) : billing?.status === "PARTIAL" ? (
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                        <Calendar size={12} className="text-amber-600" />
+                        Payé {billing.amountPaid} DH {billing.paidAt ? `le ${new Date(billing.paidAt).toLocaleDateString("fr-FR")}` : ""}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs text-slate-500 bg-slate-50 border border-slate-200">
+                        <Clock size={12} className="text-slate-400" />
+                        Paiement du mois en attente
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               {patient.notes && (
@@ -410,8 +432,8 @@ export default function PatientsPage() {
       )}
       {/* Patient Detail Modal */}
       {selectedPatient && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-md fade-in">
+          <div className="glass-modal rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8 shadow-2xl fade-in">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-[var(--color-text-primary)]">
                 Dossier Patient
@@ -462,6 +484,59 @@ export default function PatientsPage() {
                   <p className="text-sm font-medium">{formatDate(selectedPatient.startDate)}</p>
                 </div>
               </div>
+
+              {!isOrtho && (() => {
+                const currentMonth = new Date().getMonth() + 1;
+                const currentBilling = billings.find(
+                  (b) => b.patientId === selectedPatient.id && b.month === currentMonth
+                );
+
+                return (
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                        <CreditCard size={14} className="text-blue-600" />
+                        Paiement du mois en cours
+                      </p>
+                      <span
+                        className={`badge ${
+                          currentBilling?.status === "PAID"
+                            ? "badge-success"
+                            : currentBilling?.status === "PARTIAL"
+                            ? "badge-warning"
+                            : "badge-danger"
+                        }`}
+                      >
+                        {currentBilling?.status === "PAID"
+                          ? "Payé"
+                          : currentBilling?.status === "PARTIAL"
+                          ? "Partiel"
+                          : "En attente"}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                      <div>
+                        <span className="text-[var(--color-text-muted)]">Montant :</span>{" "}
+                        <strong className="text-slate-800">
+                          {currentBilling?.amountPaid ?? 0} / {selectedPatient.monthlyFee} DH
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-[var(--color-text-muted)]">Date de paiement :</span>{" "}
+                        <strong className="text-blue-700">
+                          {currentBilling?.paidAt
+                            ? new Date(currentBilling.paidAt).toLocaleDateString("fr-FR", {
+                                day: "2-digit",
+                                month: "2-digit",
+                                year: "numeric",
+                              })
+                            : "Non réglé ce mois-ci"}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {selectedPatient.notes && (
                 <div className="p-4 rounded-lg bg-[var(--color-bg-tertiary)]">
@@ -556,8 +631,8 @@ export default function PatientsPage() {
       )}
 
       {showEditModal && editingPatient && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-md fade-in">
+          <div className="glass-modal rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl fade-in">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-[var(--color-text-primary)]">
                 Modifier le patient
@@ -667,8 +742,8 @@ export default function PatientsPage() {
       )}
 
       {showExitModal && exitingPatient && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-md fade-in">
+          <div className="glass-modal rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl fade-in">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-[var(--color-text-primary)]">
                 Patient quitté le centre
@@ -742,8 +817,8 @@ export default function PatientsPage() {
 
       {/* Add Patient Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-md fade-in">
+          <div className="glass-modal rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8 shadow-2xl fade-in">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-[var(--color-text-primary)]">
                 Nouveau Patient

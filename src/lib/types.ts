@@ -124,3 +124,52 @@ export interface Contact {
   role?: string;
   notes?: string;
 }
+
+export type CaisseTransactionType = "VISITE" | "PAIEMENT_MOIS" | "AUTRE_ENTREE" | "SORTIE";
+export type PaymentMethod = "CASH" | "VIREMENT" | "CHEQUE";
+
+export interface CaisseTransaction {
+  id: string;
+  date: string;
+  time: string;
+  type: CaisseTransactionType;
+  category: string;
+  amount: number;
+  paymentMethod: PaymentMethod;
+  patientId?: string;
+  patientName?: string;
+  billingId?: string;
+  description?: string;
+  createdBy?: string;
+  createdAt: string;
+}
+
+export interface CaisseClosing {
+  id: string;
+  date: string;
+  openingAmount: number;
+  closingAmount?: number | null;
+  expectedAmount?: number | null;
+  difference?: number | null;
+  isClosed: boolean;
+  closedAt?: string | null;
+  closedBy?: string | null;
+  notes?: string | null;
+}
+
+export interface CaisseData {
+  closing: CaisseClosing | null;
+  transactions: CaisseTransaction[];
+  summary: {
+    openingAmount: number;
+    totalVisites: number;
+    totalPaiementsMois: number;
+    totalAutresEntrees: number;
+    totalEntrees: number;
+    totalSorties: number;
+    soldeTheorique: number;
+    totalCash: number;
+    totalVirement: number;
+    totalCheque: number;
+  };
+}
